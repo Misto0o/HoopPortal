@@ -42,7 +42,7 @@ class HoopPortalApp {
         const setupAuthButtons = () => {
             const loginBtn = document.getElementById('loginBtn');
             const signupBtn = document.getElementById('signupBtn');
-            
+
             if (loginBtn && signupBtn) {
                 loginBtn.addEventListener('click', () => this.showLoginModal());
                 signupBtn.addEventListener('click', () => this.showSignupModal());
@@ -188,7 +188,7 @@ class HoopPortalApp {
             tab.addEventListener('click', (e) => {
                 document.querySelectorAll('.signup-tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
-                
+
                 const userType = e.target.dataset.type;
                 document.querySelectorAll('.player-field').forEach(field => {
                     field.style.display = userType === 'player' ? 'block' : 'none';
@@ -254,7 +254,7 @@ class HoopPortalApp {
         const email = document.getElementById('signupEmail').value;
         const password = document.getElementById('signupPassword').value;
         const confirm = document.getElementById('signupConfirm').value;
-        
+
         // Determine user type from which tab is active
         const activeTab = document.querySelector('.signup-tab.active');
         const userType = activeTab ? activeTab.dataset.type : 'player';
@@ -653,19 +653,19 @@ class HoopPortalApp {
 
         const modalBody = document.getElementById('playerModalBody');
         const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
-        
+
         // Get player stats from localStorage
         const stats = localStorage.getItem(`hoopportal_player_${playerId}_stats`);
         const playerStats = stats ? JSON.parse(stats) : { ppg: null, apg: null, rpg: null, fg: null };
-        
+
         // Get player profile picture
         const pfp = localStorage.getItem(`hoopportal_player_${playerId}_pfp`);
         const profilePic = pfp || player.emoji;
         const isEmoji = profilePic === player.emoji;
-        
+
         modalBody.innerHTML = `
-            <div style="display: grid; grid-template-columns: 1fr 280px; gap: 2rem;">
-                <!-- LEFT SIDE: MAIN INFO -->
+            <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+                <!-- MAIN INFO -->
                 <div>
                     <div style="text-align: center; margin-bottom: 2rem;">
                         <div style="font-size: 4rem; margin-bottom: 1rem; ${isEmoji ? '' : 'display: none;'}">${isEmoji ? profilePic : ''}</div>
@@ -715,37 +715,36 @@ class HoopPortalApp {
                         <a href="${player.transcript}" target="_blank" style="color: var(--primary-orange); text-decoration: none; font-weight: 600;">📄 View Transcript</a>
                     </div>
 
-                    <div style="display: flex; gap: 1rem;">
-                        <button class="btn btn-primary btn-block" onclick="app.likePlayer(${playerId})" id="likeBtn" style="${likeButtonStyle}; padding: 0.75rem 1.75rem;">
-                            ${player.liked ? '❤️ Liked (' + player.likes + ')' : '🤍 Like (' + player.likes + ')'}
-                        </button>
-                        <button class="btn btn-primary btn-block" style="padding: 0.75rem 1.75rem;">Contact Player</button>
-                    </div>
-                </div>
-
-                <!-- RIGHT SIDE: STATS SIDEBAR -->
-                <div>
-                    <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);">
+                    <!-- STATS SIDEBAR MOVED BELOW -->
+                    <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); margin-bottom: 2rem;">
                         <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; padding-bottom: 0.75rem; border-bottom: 1px solid #3a3f47; font-weight: 700; color: #f0f0f0;">Season Stats</h3>
                         
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">PPG</div>
-                                <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${playerStats.ppg || '—'}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.ppg || '—'}</div>
                             </div>
                             <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">APG</div>
-                                <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${playerStats.apg || '—'}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.apg || '—'}</div>
                             </div>
                             <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">RPG</div>
-                                <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${playerStats.rpg || '—'}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.rpg || '—'}</div>
                             </div>
                             <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
                                 <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">FG%</div>
-                                <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${playerStats.fg ? playerStats.fg + '%' : '—'}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.fg ? playerStats.fg + '%' : '—'}</div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- BUTTONS AT BOTTOM -->
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <button class="btn btn-primary btn-block" onclick="app.likePlayer(${playerId})" id="likeBtn" style="${likeButtonStyle}; padding: 1rem 1.75rem; font-size: 1rem;">
+                            ${player.liked ? '❤️ Liked (' + player.likes + ')' : '🤍 Like (' + player.likes + ')'}
+                        </button>
+                        <button class="btn btn-primary btn-block" style="padding: 1rem 1.75rem; font-size: 1rem;">Contact Player</button>
                     </div>
                 </div>
             </div>
