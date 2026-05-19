@@ -6,26 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Billing & Payment - HoopPortal</title>
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/navigation.css">
+    <link rel="stylesheet" href="/extras/navbar.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/subscription.css">
     <link rel="stylesheet" href="/css/utilities.css">
 </head>
 
 <body>
-    <!-- Navigation -->
-    <nav class="navbar" id="navbar">
-        <div class="nav-container">
-            <a href="index.html" class="nav-logo">HOOPPORTAL</a>
-            <div class="nav-menu" id="navMenu">
-                <a href="index.html" class="nav-link">Home</a>
-                <a href="search.html" class="nav-link">Search Players</a>
-                <a href="plans.html" class="nav-link">Plans</a>
-                <button class="nav-btn nav-btn-login" id="loginBtn">Log In</button>
-                <button class="nav-btn nav-btn-signup" id="signupBtn">Sign Up</button>
-            </div>
-        </div>
-    </nav>
+    <!-- Navigation will be loaded here by navbar.js -->
 
     <!-- BILLING SECTION -->
     <section class="profile-section">
@@ -221,6 +209,8 @@
             document.getElementById('totalPrice').textContent = price;
         });
     </script>
+    <script src="/extras/navbar.js"></script>
+    <script src="/js/app.js"></script>
 </body>
 
 </html>
