@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing & Payment - HoopPortal</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/navigation.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/subscription.css">
+    <link rel="stylesheet" href="/css/utilities.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">HOOPPORTAL</a>
+            <div class="nav-menu" id="navMenu">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="search.html" class="nav-link">Search Players</a>
+                <a href="plans.html" class="nav-link">Plans</a>
+                <button class="nav-btn nav-btn-login" id="loginBtn">Log In</button>
+                <button class="nav-btn nav-btn-signup" id="signupBtn">Sign Up</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- BILLING SECTION -->
+    <section class="profile-section">
+        <div class="section-container">
+            <h1>Billing & Payment</h1>
+
+            <div class="profile-container">
+                <div class="profile-card">
+                    <h2>Billing & Payment</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 2rem;">Enter your details to activate your
+                        profile instantly.</p>
+
+                    <!-- Selected Plan Display -->
+                    <div
+                        style="background-color: var(--secondary-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Selected Plan
+                            </p>
+                            <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0;" id="selectedPlan">Premium</h3>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0; margin-top: 0.3rem;"
+                                id="planDetails">($4.99/month)</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Total</p>
+                            <p style="font-size: 2rem; font-weight: 900; color: var(--primary-orange); margin: 0;"
+                                id="totalPrice">$4.99</p>
+                        </div>
+                    </div>
+
+                    <!-- Billing Form -->
+                    <form id="billingForm" class="profile-form">
+                        <div class="form-group">
+                            <label>Billing Name *</label>
+                            <input type="text" id="billingName" placeholder="Full Name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Billing Email *</label>
+                            <input type="email" id="billingEmail" placeholder="your@email.com" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Card Number *</label>
+                            <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19"
+                                required>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Expiration *</label>
+                                <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" required>
+                            </div>
+                            <div class="form-group">
+                                <label>CVV *</label>
+                                <input type="text" id="cardCVV" placeholder="123" maxlength="4" required>
+                            </div>
+                        </div>
+
+                        <div
+                            style="background-color: var(--secondary-dark); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.8rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-orange)"
+                                stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">🔒 Secured & encrypted
+                                checkout</p>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Confirm and Activate</button>
+                    </form>
+
+                    <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 1.5rem;">
+                        By clicking "Confirm and Activate", you agree to our payment terms. Your subscription will renew
+                        monthly unless cancelled.
+                    </p>
+                </div>
+
+                <!-- Subscription Info -->
+                <div class="profile-card">
+                    <h2>Subscription Information</h2>
+
+                    <div style="margin-bottom: 2rem;">
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">What's Included
+                            in Premium:</p>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Full profile
+                                visibility to all coaches</li>
+                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Featured at
+                                the top of all searches</li>
+                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Premium badge
+                                (⭐) on your profile</li>
+                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Up to 5
+                                highlight reels</li>
+                            <li style="padding: 0.6rem 0;">✓ Priority coach notifications</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Cancel Anytime:
+                        </p>
+                        <p style="color: var(--text-muted); font-size: 0.95rem;">You can cancel your subscription at any
+                            time from your dashboard. No questions asked.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ -->
+                <div class="profile-card">
+                    <h2>Questions?</h2>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">When will I be charged?</h4>
+                        <p style="color: var(--text-muted); margin: 0;">You'll be charged today, then monthly on the
+                            same date. Cancel anytime.</p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">Is my payment information secure?</h4>
+                        <p style="color: var(--text-muted); margin: 0;">Yes! We use industry-standard encryption and
+                            never store full card numbers.</p>
+                    </div>
+
+                    <div>
+                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">Can I change my plan later?</h4>
+                        <p style="color: var(--text-muted); margin: 0;">Absolutely! You can upgrade, downgrade, or
+                            cancel anytime from your dashboard.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modals -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        // Handle card number formatting
+        document.getElementById('cardNumber')?.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\s/g, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formatted;
+        });
+
+        // Handle expiry formatting
+        document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+
+        // Handle billing form
+        document.getElementById('billingForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            // Get form data
+            const name = document.getElementById('billingName').value;
+            const email = document.getElementById('billingEmail').value;
+            const card = document.getElementById('cardNumber').value;
+            const plan = document.getElementById('selectedPlan').textContent;
+
+            // Show success message
+            app?.showNotification(`✓ ${plan} subscription activated! Check your email for confirmation.`, 'success');
+
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 2000);
+        });
+
+        // Get plan from URL or localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const user = localStorage.getItem('hoopportal_user');
+            if (!user) {
+                window.location.href = 'plans.html';
+                return;
+            }
+
+            const userData = JSON.parse(user);
+            const plan = userData.subscription || 'premium';
+            const price = plan === 'premium' ? '$4.99' : '$1.99';
+            const planName = plan === 'premium' ? 'Premium' : 'Basic';
+            const planText = plan === 'premium' ? '($4.99/month)' : '($1.99/month)';
+
+            document.getElementById('selectedPlan').textContent = planName;
+            document.getElementById('planDetails').textContent = planText;
+            document.getElementById('totalPrice').textContent = price;
+        });
+    </script>
+</body>
+
+</html>

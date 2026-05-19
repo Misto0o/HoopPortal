@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plans & Pricing - HoopPortal</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/navigation.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/subscription.css">
+    <link rel="stylesheet" href="/css/utilities.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">HOOPPORTAL</a>
+            <div class="nav-menu" id="navMenu">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="search.html" class="nav-link">Search Players</a>
+                <a href="plans.html" class="nav-link active">Plans</a>
+                <button class="nav-btn nav-btn-login" id="loginBtn">Log In</button>
+                <button class="nav-btn nav-btn-signup" id="signupBtn">Sign Up</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- PLANS SECTION -->
+    <section class="plans-page-section">
+        <div class="section-container">
+            <div class="plans-header">
+                <h1>Choose Your Plan</h1>
+                <p>Activate your visibility and get recruited by college coaches</p>
+            </div>
+
+            <div class="plans-grid">
+                <!-- BASIC PLAN -->
+                <div class="plan-card">
+                    <div class="plan-header">
+                        <span class="plan-tag">STARTER</span>
+                        <h3>Basic</h3>
+                    </div>
+                    <p class="plan-description">Get your profile live and discoverable to every coach searching the portal.</p>
+                    <div class="plan-price">
+                        <span class="price">$1.99</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="feature-included">✓ Full profile creation</li>
+                        <li class="feature-included">✓ Up to 2 highlight reels</li>
+                        <li class="feature-included">✓ Listed in all coach searches</li>
+                        <li class="feature-excluded">✕ Premium positioning</li>
+                        <li class="feature-excluded">✕ Featured badge</li>
+                    </ul>
+                    <button class="btn btn-secondary btn-block select-plan-btn" data-plan="basic">Select Basic Plan</button>
+                </div>
+
+                <!-- PREMIUM PLAN -->
+                <div class="plan-card premium">
+                    <div class="plan-header premium-header">
+                        <span class="plan-tag premium-tag">⭐ MOST RECRUITED</span>
+                        <h3>Premium</h3>
+                    </div>
+                    <p class="plan-description">Skip the line. Featured at the top of every coach's search results.</p>
+                    <div class="plan-price">
+                        <span class="price">$4.99</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="feature-included">✓ Full profile creation</li>
+                        <li class="feature-included">✓ Up to 5 highlight reels</li>
+                        <li class="feature-included">✓ Featured at top of searches</li>
+                        <li class="feature-included">✓ Premium positioning badge ⭐</li>
+                        <li class="feature-included">✓ Priority visibility</li>
+                    </ul>
+                    <button class="btn btn-primary btn-block select-plan-btn" data-plan="premium">Select Premium Plan</button>
+                </div>
+            </div>
+
+            <div class="plans-comparison">
+                <h2>Plan Comparison</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th class="basic-col">Basic</th>
+                            <th class="premium-col">Premium</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Profile Creation</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Highlight Reels</td>
+                            <td>Up to 2</td>
+                            <td>Up to 5</td>
+                        </tr>
+                        <tr>
+                            <td>Searchable Profile</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Featured Position</td>
+                            <td>✕</td>
+                            <td>✓ At Top</td>
+                        </tr>
+                        <tr>
+                            <td>Premium Badge</td>
+                            <td>✕</td>
+                            <td>✓ ⭐</td>
+                        </tr>
+                        <tr>
+                            <td>Coach Priority</td>
+                            <td>Standard</td>
+                            <td>✓ High</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="faq-section">
+                <h2>Frequently Asked Questions</h2>
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <h4>Can I change my plan?</h4>
+                        <p>Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>How do I add highlight reels?</h4>
+                        <p>After selecting a plan and creating your profile, you'll have access to upload highlights. Basic allows 2, Premium allows 5.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>Is my profile searchable right away?</h4>
+                        <p>Yes! Once you activate a plan, your profile becomes searchable and coaches can find you.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h4>What's the difference between Basic and Premium?</h4>
+                        <p>Premium gets you featured at the top of coach searches with a premium badge, plus 3 extra highlight reels.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modals -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
