@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Sign In - HoopPortal</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0f0f12;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #333;
+            border-top-color: #f97316;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="loader"></div>
+        <h2>Completing sign in...</h2>
+        <p>Please wait while we set up your account.</p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://hpuikheuntquldqdewbr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwdWlraGV1bnRxdWxkcWRld2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNDc2MTQsImV4cCI6MjA5NDcyMzYxNH0.GVkICFVA3QOkZaYqf-MSag2yhCt68-M2QLGpi7_E0UA';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function handleCallback() {
+            try {
+                // Get the session
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (error) throw error;
+
+                if (session) {
+                    // Get the pending user type from session storage
+                    const pendingUserType = sessionStorage.getItem('pending_user_type') || 'player';
+
+                    // Create user profile with the correct type
+                    const { error: profileError } = await supabase
+                        .from('user_profiles')
+                        .upsert({
+                            id: session.user.id,
+                            email: session.user.email,
+                            user_type: pendingUserType,
+                            first_name: session.user.user_metadata?.full_name?.split(' ')[0] || '',
+                            last_name: session.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
+                            avatar_url: session.user.user_metadata?.avatar_url || null
+                        }, { onConflict: 'id' });
+
+                    if (profileError) {
+                        console.error('Profile creation error:', profileError);
+                    }
+
+                    // Create player or coach profile
+                    if (pendingUserType === 'player') {
+                        await supabase
+                            .from('player_profiles')
+                            .upsert({ id: session.user.id }, { onConflict: 'id' });
+                    } else {
+                        await supabase
+                            .from('coach_profiles')
+                            .upsert({ id: session.user.id }, { onConflict: 'id' });
+                    }
+
+                    // Clear the pending type
+                    sessionStorage.removeItem('pending_user_type');
+
+                    // Redirect to the appropriate dashboard
+                    if (pendingUserType === 'coach') {
+                        window.location.href = '/coach-dashboard.html';
+                    } else {
+                        window.location.href = '/profile.html';
+                    }
+                } else {
+                    window.location.href = '/index.html';
+                }
+            } catch (err) {
+                console.error('Callback error:', err);
+                window.location.href = '/index.html';
+            }
+        }
+
+        handleCallback();
+    </script>
+</body>
+
+</html>

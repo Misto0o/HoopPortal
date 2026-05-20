@@ -25,7 +25,6 @@ async function initializeSupabase() {
 class HoopPortalApp {
     constructor() {
         this.currentUser = null;
-        this.mockPlayers = this.generateMockPlayers(); // 25 mock players for testing
         this.realPlayers = [];
         this.playerStats = {};
         this.userLikedPlayers = [];
@@ -108,20 +107,83 @@ class HoopPortalApp {
         const { data: { session }, error } = await supabaseClient.auth.getSession();
 
         if (session && session.user) {
+            // Check if there's a pending user type from Google signup
+            const pendingUserType = localStorage.getItem('pending_user_type');
+
+            // Get existing user type from user_profiles
+            let { data: userProfile } = await supabaseClient
+                .from('user_profiles')
+                .select('user_type')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+            // If no profile exists and we have a pending type, create the profile
+            if (!userProfile && pendingUserType) {
+                // Create user profile with the pending type
+                const { error: insertError } = await supabaseClient
+                    .from('user_profiles')
+                    .insert({
+                        id: session.user.id,
+                        email: session.user.email,
+                        user_type: pendingUserType,
+                        first_name: session.user.user_metadata?.full_name?.split(' ')[0] || '',
+                        last_name: session.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
+                        avatar_url: session.user.user_metadata?.avatar_url || null
+                    });
+
+                if (!insertError) {
+                    // Create player or coach profile
+                    if (pendingUserType === 'player') {
+                        await supabaseClient
+                            .from('player_profiles')
+                            .insert({ id: session.user.id });
+                    } else if (pendingUserType === 'coach') {
+                        await supabaseClient
+                            .from('coach_profiles')
+                            .insert({ id: session.user.id });
+                    }
+
+                    userProfile = { user_type: pendingUserType };
+                }
+
+                // Clear the pending type
+                localStorage.removeItem('pending_user_type');
+            }
+
+            // If still no profile, redirect to signup to choose type
+            if (!userProfile) {
+                await supabaseClient.auth.signOut();
+                this.showNotification('Please sign up first to choose your account type', 'error');
+                window.location.href = '/index.html';
+                return;
+            }
+
             this.currentUser = {
                 id: session.user.id,
                 email: session.user.email,
-                userType: 'player',
+                userType: userProfile.user_type,
                 createdAt: new Date(),
                 avatar: session.user.user_metadata?.avatar_url || null
             };
             localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
-            await this.loadUserData();
-            await this.loadPlayerProfile();
+
+            if (this.currentUser.userType === 'player') {
+                await this.loadUserData();
+                await this.loadPlayerProfile();
+            } else if (this.currentUser.userType === 'coach') {
+                await this.loadCoachProfile();
+                await this.loadCoachLikedPlayers();
+            }
+
             this.updateNavigation();
 
-            if (window.location.hash === '#' || window.location.pathname === '/') {
-                setTimeout(() => window.location.href = 'profile.html', 500);
+            // Only redirect if on homepage
+            if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+                if (this.currentUser.userType === 'coach') {
+                    window.location.href = 'coach-dashboard.html';
+                } else {
+                    window.location.href = 'profile.html';
+                }
             }
             return;
         }
@@ -181,9 +243,17 @@ class HoopPortalApp {
 
         <div class="auth-divider">or</div>
 
-        <button class="btn btn-social" id="googleSignupBtn">
-            <span>Continue with Google</span>
-        </button>
+        <div class="google-signup-container">
+            <div style="margin-bottom: 10px; font-size: 0.85rem; color: var(--text-muted);">Continue with Google as:</div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-social" id="googlePlayerBtn" style="flex: 1;">
+                    <span>🏀 Player</span>
+                </button>
+                <button class="btn btn-social" id="googleCoachBtn" style="flex: 1;">
+                    <span>👨‍🏫 Coach</span>
+                </button>
+            </div>
+        </div>
 
         <p class="auth-footer">
             Already have an account? 
@@ -193,11 +263,11 @@ class HoopPortalApp {
 
         modal.classList.add('show');
 
+        // Tab switching
         document.querySelectorAll('.signup-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 document.querySelectorAll('.signup-tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
-
                 const userType = e.target.dataset.type;
                 document.querySelectorAll('.player-field').forEach(field => {
                     field.style.display = userType === 'player' ? 'block' : 'none';
@@ -208,21 +278,23 @@ class HoopPortalApp {
             });
         });
 
-        const googleSignupBtn = document.getElementById('googleSignupBtn');
-        if (googleSignupBtn) {
-            googleSignupBtn.addEventListener('click', () => this.handleGoogleSignup());
-        }
+        // Google signup with type
+        document.getElementById('googlePlayerBtn')?.addEventListener('click', () => this.handleGoogleSignupWithType('player'));
+        document.getElementById('googleCoachBtn')?.addEventListener('click', () => this.handleGoogleSignupWithType('coach'));
 
         document.getElementById('signupFormModal').addEventListener('submit', (e) => this.handleSignup(e));
         document.getElementById('switchToLogin').addEventListener('click', () => this.showLoginModal());
     }
 
-    async handleGoogleSignup() {
+    async handleGoogleSignupWithType(userType) {
         try {
+            // Store the intended user type in localStorage before OAuth redirect
+            localStorage.setItem('pending_user_type', userType);
+
             const { data, error } = await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: window.location.origin + window.location.pathname
                 }
             });
             if (error) throw error;
@@ -231,12 +303,14 @@ class HoopPortalApp {
         }
     }
 
+
     async handleGoogleSignin() {
         try {
+            // For existing users signing in, no pending type needed
             const { data, error } = await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: window.location.origin + window.location.pathname
                 }
             });
             if (error) throw error;
@@ -305,6 +379,15 @@ class HoopPortalApp {
         const activeTab = document.querySelector('.signup-tab.active');
         const userType = activeTab ? activeTab.dataset.type : 'player';
 
+        const fullName = document.getElementById('signupName')?.value || '';
+        let firstName = '';
+        let lastName = '';
+        if (fullName) {
+            const nameParts = fullName.trim().split(' ');
+            firstName = nameParts[0];
+            lastName = nameParts.slice(1).join(' ');
+        }
+
         if (password !== confirm) {
             this.showNotification('Passwords do not match', 'error');
             return;
@@ -315,60 +398,330 @@ class HoopPortalApp {
             return;
         }
 
+        // Disable submit button to prevent multiple attempts
+        const submitBtn = document.querySelector('#signupFormModal button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating account...';
+        }
+
         try {
             const { data, error } = await supabaseClient.auth.signUp({
                 email,
-                password
+                password,
+                options: {
+                    data: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        user_type: userType
+                    }
+                }
             });
 
-            if (error) throw error;
+            if (error) {
+                // Handle specific error types
+                if (error.message.includes('rate limit') || error.message.includes('25 seconds')) {
+                    this.showNotification('Too many attempts. Please wait 1-2 minutes before trying again.', 'error');
+                } else if (error.message.includes('User already registered')) {
+                    this.showNotification('An account with this email already exists. Please log in instead.', 'error');
+                } else {
+                    this.showNotification(error.message, 'error');
+                }
+                console.error('Signup error:', error);
+
+                // Re-enable submit button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Sign Up';
+                }
+                return;
+            }
 
             if (!data.user) {
-                throw new Error('Signup failed. Please try again.');
+                throw new Error('No user returned from signup');
             }
 
             this.currentUser = {
                 id: data.user.id,
                 email: data.user.email,
-                userType,
+                userType: userType,
                 createdAt: new Date(),
-                avatar: null
+                avatar: null,
+                first_name: firstName,
+                last_name: lastName
             };
 
             localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
 
-            // Create profiles in Supabase
-            await this.createUserProfile(userType);
+            await this.createUserProfile(userType, firstName, lastName);
             this.initializeUserData();
-            await this.loadUserData();
 
-            this.showNotification('Account created! Check your email to confirm.', 'success');
-            this.closeModal(document.getElementById('authModal'));
-            this.updateNavigation();
+            if (data.session) {
+                this.showNotification('Account created successfully!', 'success');
+                this.closeModal(document.getElementById('authModal'));
+                this.updateNavigation();
 
-            if (userType === 'player') {
-                setTimeout(() => window.location.href = 'profile.html', 1500);
+                setTimeout(() => {
+                    if (userType === 'player') {
+                        window.location.href = 'profile.html';
+                    } else {
+                        window.location.href = 'coach-dashboard.html';
+                    }
+                }, 1500);
+            } else {
+                this.showNotification('Account created! Please check your email to confirm.', 'success');
+                this.closeModal(document.getElementById('authModal'));
             }
+
         } catch (error) {
-            this.showNotification(error.message || 'Signup failed', 'error');
             console.error('Signup error:', error);
+            this.showNotification(error.message || 'Signup failed. Please try again.', 'error');
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Sign Up';
+            }
         }
     }
 
-    async createUserProfile(userType) {
+    async loadCoachProfile() {
+        if (!this.currentUser || this.currentUser.userType !== 'coach') return;
+
+        // Check if we're on the coach dashboard page
+        if (!window.location.pathname.includes('coach-dashboard.html')) return;
+
+        try {
+            const { data: coachProfile, error } = await supabaseClient
+                .from('coach_profiles')
+                .select('*')
+                .eq('id', this.currentUser.id)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (coachProfile) {
+                // Add null checks for each element
+                const firstNameEl = document.getElementById('coachFirstName');
+                if (firstNameEl) firstNameEl.value = coachProfile.first_name || '';
+
+                const lastNameEl = document.getElementById('coachLastName');
+                if (lastNameEl) lastNameEl.value = coachProfile.last_name || '';
+
+                const schoolEl = document.getElementById('coachSchool');
+                if (schoolEl) schoolEl.value = coachProfile.school || '';
+
+                const teamEl = document.getElementById('coachTeam');
+                if (teamEl) teamEl.value = coachProfile.team || '';
+
+                const roleEl = document.getElementById('coachRole');
+                if (roleEl) roleEl.value = coachProfile.role || '';
+
+                const experienceEl = document.getElementById('coachExperience');
+                if (experienceEl) experienceEl.value = coachProfile.experience || '';
+
+                const cityEl = document.getElementById('coachCity');
+                if (cityEl) cityEl.value = coachProfile.city || '';
+
+                const stateEl = document.getElementById('coachState');
+                if (stateEl) stateEl.value = coachProfile.state || '';
+
+                const bioEl = document.getElementById('coachBio');
+                if (bioEl) bioEl.value = coachProfile.bio || '';
+
+                const emailEl = document.getElementById('coachEmail');
+                if (emailEl) emailEl.value = coachProfile.email || '';
+
+                const phoneEl = document.getElementById('coachPhone');
+                if (phoneEl) phoneEl.value = coachProfile.phone || '';
+            }
+        } catch (error) {
+            console.error('Load coach profile error:', error);
+        }
+    }
+
+    async handleCoachInfo(e) {
+        e.preventDefault();
         if (!this.currentUser) return;
 
         try {
+            const { error } = await supabaseClient
+                .from('coach_profiles')
+                .upsert({
+                    id: this.currentUser.id,
+                    first_name: document.getElementById('coachFirstName').value,
+                    last_name: document.getElementById('coachLastName').value,
+                    school: document.getElementById('coachSchool').value,
+                    team: document.getElementById('coachTeam').value,
+                    role: document.getElementById('coachRole').value,
+                    experience: parseInt(document.getElementById('coachExperience').value) || null,
+                    city: document.getElementById('coachCity').value,
+                    state: document.getElementById('coachState').value,
+                    bio: document.getElementById('coachBio').value,
+                    updated_at: new Date()
+                }, { onConflict: 'id' });
+
+            if (error) throw error;
+            this.showNotification('Coach information saved!', 'success');
+        } catch (error) {
+            console.error('Save coach error:', error);
+            this.showNotification(error.message || 'Failed to save', 'error');
+        }
+    }
+
+    async handleCoachContact(e) {
+        e.preventDefault();
+        if (!this.currentUser) return;
+
+        try {
+            const { error } = await supabaseClient
+                .from('coach_profiles')
+                .update({
+                    email: document.getElementById('coachEmail').value,
+                    phone: document.getElementById('coachPhone').value,
+                    updated_at: new Date()
+                })
+                .eq('id', this.currentUser.id);
+
+            if (error) throw error;
+            this.showNotification('Contact information saved!', 'success');
+        } catch (error) {
+            console.error('Save contact error:', error);
+            this.showNotification(error.message || 'Failed to save', 'error');
+        }
+    }
+
+    async loadCoachLikedPlayers() {
+        if (!this.currentUser || this.currentUser.userType !== 'coach') return;
+
+        // Check if we're on the coach dashboard page
+        if (!window.location.pathname.includes('coach-dashboard.html')) return;
+
+        // Check if elements exist before using them
+        const likedContainer = document.getElementById('likedPlayersContainer');
+        const likedCountEl = document.getElementById('likedCount');
+        const viewAllContainer = document.getElementById('viewAllButtonContainer');
+
+        if (!likedContainer) return;
+
+        try {
+            // Get liked player IDs from Supabase
+            const { data: likedData, error } = await supabaseClient
+                .from('liked_players')
+                .select('player_id')
+                .eq('user_id', this.currentUser.id);
+
+            if (error) throw error;
+
+            const playerIds = likedData.map(l => l.player_id);
+
+            // Update the liked status in realPlayers
+            this.realPlayers.forEach(player => {
+                player.liked = playerIds.includes(player.id);
+            });
+
+            if (playerIds.length === 0) {
+                likedContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); grid-column: 1/-1;">No liked players yet. Browse players and click the ❤️ button to start your recruiting list!</p>';
+                if (likedCountEl) likedCountEl.textContent = '0';
+                if (viewAllContainer) viewAllContainer.innerHTML = '';
+                return;
+            }
+
+            // Get player details
+            const { data: players, error: playersError } = await supabaseClient
+                .from('player_profiles')
+                .select('*')
+                .in('id', playerIds);
+
+            if (playersError) throw playersError;
+
+            // Get user names
+            const { data: users } = await supabaseClient
+                .from('user_profiles')
+                .select('id, first_name, last_name')
+                .in('id', playerIds);
+
+            const userMap = {};
+            users?.forEach(u => {
+                userMap[u.id] = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+            });
+
+            if (likedCountEl) likedCountEl.textContent = players.length;
+
+            const displayPlayers = players.slice(0, 4);
+            const hasMore = players.length > 4;
+
+            likedContainer.innerHTML = displayPlayers.map(player => {
+                const name = userMap[player.id] || 'Unknown Player';
+                const roleBadge = this.getRoleBadge(player.position);
+                return `
+                <div class="liked-player-card" onclick="app.showPlayerModal('${player.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <h4 style="margin: 0;">${this.escapeHtml(name)}</h4>
+                        ${roleBadge}
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">
+                            ${player.position || 'No position'} • ${player.class_year || 'No class'}
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">
+                            ${player.city || ''} ${player.state || ''}
+                        </div>
+                        ${player.height ? `<div style="font-size: 0.85rem;">${player.height} | ${player.weight ? player.weight + ' lbs' : ''}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            if (hasMore) {
+                const viewAllCard = document.createElement('div');
+                viewAllCard.className = 'liked-player-card';
+                viewAllCard.style.cssText = 'display: flex; align-items: center; justify-content: center; flex-direction: column; background-color: var(--primary-dark); border: 2px dashed var(--border-color);';
+                viewAllCard.onclick = () => this.showAllLikedPlayersModal(players, userMap);
+                viewAllCard.innerHTML = `
+                <div style="font-size: 2rem;">👥</div>
+                <div style="font-weight: 600; margin-top: 0.5rem;">View All (${players.length})</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Click to see all liked players</div>
+            `;
+                likedContainer.appendChild(viewAllCard);
+            }
+
+        } catch (error) {
+            console.error('Load liked players error:', error);
+        }
+    }
+
+    getRoleBadge(position) {
+        const badges = {
+            'PG': '<span class="role-badge" style="background:#3b82f6;">PG</span>',
+            'SG': '<span class="role-badge" style="background:#3b82f6;">SG</span>',
+            'SF': '<span class="role-badge" style="background:#3b82f6;">SF</span>',
+            'PF': '<span class="role-badge" style="background:#3b82f6;">PF</span>',
+            'C': '<span class="role-badge" style="background:#3b82f6;">C</span>'
+        };
+        return badges[position] || '';
+    }
+
+    async createUserProfile(userType, firstName = '', lastName = '') {
+        if (!this.currentUser) return;
+
+        try {
+            console.log('Creating user profile for:', this.currentUser.id, userType);
+
             const { error: userError } = await supabaseClient
                 .from('user_profiles')
                 .upsert({
                     id: this.currentUser.id,
                     email: this.currentUser.email,
                     user_type: userType,
+                    first_name: firstName,
+                    last_name: lastName,
                     avatar_url: this.currentUser.avatar
                 }, { onConflict: 'id' });
 
-            if (userError) throw userError;
+            if (userError) {
+                console.error('User profile error:', userError);
+                throw userError;
+            }
 
             if (userType === 'player') {
                 const { error: playerError } = await supabaseClient
@@ -377,7 +730,10 @@ class HoopPortalApp {
                         id: this.currentUser.id
                     });
 
-                if (playerError && playerError.code !== '23505') throw playerError;
+                if (playerError && playerError.code !== '23505') {
+                    console.error('Player profile error:', playerError);
+                    throw playerError;
+                }
             }
 
             if (userType === 'coach') {
@@ -387,8 +743,13 @@ class HoopPortalApp {
                         id: this.currentUser.id
                     });
 
-                if (coachError && coachError.code !== '23505') throw coachError;
+                if (coachError && coachError.code !== '23505') {
+                    console.error('Coach profile error:', coachError);
+                    throw coachError;
+                }
             }
+
+            console.log('Profile created successfully');
         } catch (error) {
             console.error('Create profile error:', error);
         }
@@ -408,10 +769,17 @@ class HoopPortalApp {
 
             if (error) throw error;
 
+            // Get user type from user_profiles
+            const { data: userProfile } = await supabaseClient
+                .from('user_profiles')
+                .select('user_type')
+                .eq('id', data.user.id)
+                .single();
+
             this.currentUser = {
                 id: data.user.id,
                 email: data.user.email,
-                userType: 'player',
+                userType: userProfile?.user_type || 'player',
                 createdAt: new Date(),
                 avatar: null
             };
@@ -422,6 +790,13 @@ class HoopPortalApp {
             this.showNotification('Signed in successfully!', 'success');
             this.closeModal(document.getElementById('authModal'));
             this.updateNavigation();
+
+            // Redirect based on user type
+            if (this.currentUser.userType === 'coach') {
+                window.location.href = 'coach-dashboard.html';
+            } else {
+                window.location.href = 'profile.html';
+            }
         } catch (error) {
             this.showNotification(error.message, 'error');
         }
@@ -446,32 +821,38 @@ class HoopPortalApp {
             const profileBanner = document.createElement('button');
             profileBanner.id = 'navProfileBanner';
             profileBanner.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                background: linear-gradient(135deg, #2a2d33 0%, #1e2025 100%);
-                border: 1px solid #404450;
-                padding: 6px 14px;
-                border-radius: 30px;
-                cursor: pointer;
-                color: #f0f0f0;
-                font-weight: 600;
-                transition: all 0.2s ease;
-            `;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #2a2d33 0%, #1e2025 100%);
+            border: 1px solid #404450;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            color: #f0f0f0;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        `;
             profileBanner.addEventListener('mouseover', () => profileBanner.style.borderColor = 'var(--primary-orange)');
             profileBanner.addEventListener('mouseout', () => profileBanner.style.borderColor = '#404450');
-            profileBanner.addEventListener('click', () => window.location.href = 'dashboard.html');
+
+            // Fix: Check userType for correct dashboard redirect
+            if (this.currentUser.userType === 'coach') {
+                profileBanner.addEventListener('click', () => window.location.href = 'coach-dashboard.html');
+            } else {
+                profileBanner.addEventListener('click', () => window.location.href = 'profile.html');
+            }
 
             if (this.currentUser.avatar) {
                 profileBanner.innerHTML = `
-                    <img src="${this.currentUser.avatar}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary-orange);" alt="Profile">
-                    <span style="font-size: 0.9rem;">Dashboard</span>
-                `;
+                <img src="${this.currentUser.avatar}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary-orange);" alt="Profile">
+                <span style="font-size: 0.9rem;">Dashboard</span>
+            `;
             } else {
                 profileBanner.innerHTML = `
-                    <span style="font-size: 1.2rem; line-height: 1;">🏀</span>
-                    <span style="font-size: 0.9rem;">Dashboard</span>
-                `;
+                <span style="font-size: 1.2rem; line-height: 1;">🏀</span>
+                <span style="font-size: 0.9rem;">Dashboard</span>
+            `;
             }
 
             const logoutBtn = document.createElement('button');
@@ -888,9 +1269,35 @@ class HoopPortalApp {
 
             this.updateQuickProfile();
             await this.loadHighlightReels();
+            await this.loadSubscriptionStatus();
+
 
         } catch (err) {
             console.error('Load profile error:', err);
+        }
+    }
+
+    // Add this method to load subscription display
+    async loadSubscriptionStatus() {
+        if (!this.currentUser) return;
+
+        const subPlanEl = document.getElementById('subPlan');
+        const manageBtn = document.getElementById('managePlanBtn');
+
+        if (subPlanEl) {
+            const plan = this.currentUser.subscription || 'basic';
+            subPlanEl.textContent = plan === 'premium' ? '⭐ Premium' : 'Basic';
+        }
+
+        if (manageBtn) {
+            if (this.currentUser.subscription === 'premium') {
+                manageBtn.textContent = 'Manage Plan';
+            } else {
+                manageBtn.textContent = 'Upgrade to Premium';
+            }
+            manageBtn.addEventListener('click', () => {
+                window.location.href = 'plans.html';
+            });
         }
     }
 
@@ -975,6 +1382,29 @@ class HoopPortalApp {
 
             if (userError) throw userError;
 
+            // Get like counts for all players
+            const { data: likesData, error: likesError } = await supabaseClient
+                .from('liked_players')
+                .select('player_id');
+
+            if (likesError) throw likesError;
+
+            // Count likes per player
+            const likeCounts = {};
+            likesData?.forEach(like => {
+                likeCounts[like.player_id] = (likeCounts[like.player_id] || 0) + 1;
+            });
+
+            // Get current user's liked players (if logged in)
+            let userLikes = [];
+            if (this.currentUser) {
+                const { data: userLikesData } = await supabaseClient
+                    .from('liked_players')
+                    .select('player_id')
+                    .eq('user_id', this.currentUser.id);
+                userLikes = userLikesData?.map(l => l.player_id) || [];
+            }
+
             // Create a map for quick lookup
             const userMap = {};
             userData.forEach(user => {
@@ -1005,8 +1435,8 @@ class HoopPortalApp {
                     state: player.state,
                     classYear: player.class_year,
                     premium: player.is_premium,
-                    likes: 0,
-                    liked: false,
+                    likes: likeCounts[player.id] || 0,
+                    liked: userLikes.includes(player.id),
                     description: player.game_description || '',
                     coachType: player.coach_preferences || '',
                     realProfile: true
@@ -1019,7 +1449,6 @@ class HoopPortalApp {
             console.error('Load search players error:', err);
         }
     }
-
     updateQuickProfile() {
         const position = document.getElementById('position')?.value;
         const height = document.getElementById('height')?.value;
@@ -1237,70 +1666,6 @@ class HoopPortalApp {
         }
     }
 
-    // ============================================
-    // GENERATE MOCK PLAYERS (25 players)
-    // ============================================
-    generateMockPlayers() {
-        const ncPlayers = [
-            { name: 'Marcus Johnson', position: 'PG', height: "6'1\"", weight: 185, school: 'Lincoln High', city: 'Charlotte', state: 'NC', classYear: 2027, ppg: 18.5, apg: 7.2, rpg: 3.1 },
-            { name: 'DeAndre Williams', position: 'SG', height: "6'3\"", weight: 195, school: 'West Charlotte High', city: 'Charlotte', state: 'NC', classYear: 2026, ppg: 22.1, apg: 5.3, rpg: 4.2 },
-            { name: 'Malik Davis', position: 'SF', height: "6'6\"", weight: 215, school: 'Riverside High', city: 'Durham', state: 'NC', classYear: 2027, ppg: 19.4, apg: 4.1, rpg: 7.3 },
-            { name: 'Jamal Robinson', position: 'PF', height: "6'8\"", weight: 240, school: 'Raleigh Central', city: 'Raleigh', state: 'NC', classYear: 2026, ppg: 17.8, apg: 2.5, rpg: 10.2 },
-            { name: 'Tyrone Jackson', position: 'C', height: "6'10\"", weight: 260, school: 'Greensboro Academy', city: 'Greensboro', state: 'NC', classYear: 2027, ppg: 15.2, apg: 1.8, rpg: 12.5 },
-            { name: 'Brandon Lee', position: 'PG', height: "6'0\"", weight: 175, school: 'Chapel Hill High', city: 'Chapel Hill', state: 'NC', classYear: 2028, ppg: 20.3, apg: 8.1, rpg: 2.9 },
-            { name: 'Antonio Martinez', position: 'SG', height: "6'4\"", weight: 205, school: 'Winston-Salem Prep', city: 'Winston-Salem', state: 'NC', classYear: 2026, ppg: 24.7, apg: 6.2, rpg: 5.1 },
-            { name: 'Isaiah Thompson', position: 'SF', height: "6'7\"", weight: 220, school: 'Wilmington High', city: 'Wilmington', state: 'NC', classYear: 2027, ppg: 18.9, apg: 3.7, rpg: 6.8 },
-            { name: 'Jaylen Brown', position: 'PF', height: "6'9\"", weight: 235, school: 'Fayetteville Academy', city: 'Fayetteville', state: 'NC', classYear: 2026, ppg: 16.5, apg: 2.3, rpg: 9.4 },
-            { name: 'Kevin Hart', position: 'C', height: "6'11\"", weight: 265, school: 'Asheville High', city: 'Asheville', state: 'NC', classYear: 2028, ppg: 14.2, apg: 1.9, rpg: 11.8 },
-        ];
-
-        const outOfStatePlayer = [
-            { name: 'Zion Williams', position: 'PG', height: "6'2\"", weight: 190, school: 'Atlanta Prep', city: 'Atlanta', state: 'GA', classYear: 2027, ppg: 21.5, apg: 7.8, rpg: 3.5 },
-            { name: 'LeBron Jones', position: 'SG', height: "6'5\"", weight: 210, school: 'Miami High', city: 'Miami', state: 'FL', classYear: 2026, ppg: 23.2, apg: 5.9, rpg: 4.8 },
-            { name: 'Kobe Davis', position: 'SF', height: "6'7\"", weight: 225, school: 'Charleston Academy', city: 'Charleston', state: 'SC', classYear: 2027, ppg: 20.1, apg: 4.3, rpg: 7.1 },
-            { name: 'Stephen Curry', position: 'PG', height: "6'1\"", weight: 180, school: 'Richmond High', city: 'Richmond', state: 'VA', classYear: 2026, ppg: 25.4, apg: 8.7, rpg: 3.2 },
-            { name: 'Giannis Antetokounmpo', position: 'PF', height: "6'10\"", weight: 250, school: 'Nashville Academy', city: 'Nashville', state: 'TN', classYear: 2027, ppg: 18.9, apg: 2.7, rpg: 11.3 },
-            { name: 'Donovan Mitchell', position: 'SG', height: "6'3\"", weight: 200, school: 'Columbia High', city: 'Columbia', state: 'SC', classYear: 2026, ppg: 22.8, apg: 6.1, rpg: 4.5 },
-            { name: 'Damian Lillard', position: 'PG', height: "6'2\"", weight: 195, school: 'Birmingham Academy', city: 'Birmingham', state: 'AL', classYear: 2028, ppg: 19.6, apg: 7.4, rpg: 3.8 },
-            { name: 'Kyrie Irving', position: 'PG', height: "6'0\"", weight: 175, school: 'New Orleans High', city: 'New Orleans', state: 'LA', classYear: 2027, ppg: 24.1, apg: 8.9, rpg: 2.9 },
-            { name: 'Jayson Tatum', position: 'SF', height: "6'8\"", weight: 230, school: 'Memphis Prep', city: 'Memphis', state: 'TN', classYear: 2026, ppg: 21.5, apg: 3.9, rpg: 8.2 },
-            { name: 'Luka Doncic', position: 'PF', height: "6'7\"", weight: 235, school: 'Phoenix Academy', city: 'Phoenix', state: 'AZ', classYear: 2027, ppg: 20.3, apg: 4.1, rpg: 9.1 },
-            { name: 'Paolo Banchero', position: 'PF', height: "6'9\"", weight: 250, school: 'Dallas High', city: 'Dallas', state: 'TX', classYear: 2026, ppg: 17.4, apg: 2.6, rpg: 10.5 },
-            { name: 'Victor Wembanyama', position: 'C', height: "7'0\"", weight: 260, school: 'Houston Academy', city: 'Houston', state: 'TX', classYear: 2028, ppg: 16.1, apg: 2.2, rpg: 12.8 },
-            { name: 'Evan Bouchard', position: 'SG', height: "6'4\"", weight: 208, school: 'Denver Prep', city: 'Denver', state: 'CO', classYear: 2027, ppg: 23.5, apg: 5.8, rpg: 4.9 },
-            { name: 'Tyler Herro', position: 'SG', height: "6'5\"", weight: 215, school: 'Milwaukee Academy', city: 'Milwaukee', state: 'WI', classYear: 2026, ppg: 21.9, apg: 6.3, rpg: 5.2 },
-            { name: 'Devin Booker', position: 'SG', height: "6'6\"", weight: 220, school: 'Cleveland High', city: 'Cleveland', state: 'OH', classYear: 2027, ppg: 22.7, apg: 5.5, rpg: 5.8 },
-        ];
-
-        const allPlayers = [...ncPlayers, ...outOfStatePlayer];
-
-        return allPlayers.map((p, idx) => ({
-            id: idx + 1,
-            name: p.name,
-            gender: 'boys',
-            position: p.position,
-            height: p.height,
-            weight: parseInt(p.weight),
-            school: p.school,
-            city: p.city,
-            state: p.state,
-            classYear: p.classYear,
-            premium: idx % 4 === 0,
-            emoji: '🏀',
-            likes: Math.floor(Math.random() * 200) + 50,
-            liked: false,
-            description: `Talented ${p.position} with strong court vision and ball handling skills.`,
-            coachType: 'Competitive program focused on development',
-            ppg: p.ppg,
-            apg: p.apg,
-            rpg: p.rpg,
-            fg: Math.round((Math.random() * 15 + 40) * 10) / 10,
-            '3p': Math.round((Math.random() * 15 + 25) * 10) / 10,
-            spg: Math.round((Math.random() * 2 + 1) * 10) / 10,
-            bpg: Math.round((Math.random() * 2 + 0.5) * 10) / 10,
-            ft: Math.round((Math.random() * 15 + 70) * 10) / 10
-        }));
-    }
 
     // ============================================
     // PROSPECTS
@@ -1309,10 +1674,10 @@ class HoopPortalApp {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         if (event && event.target) event.target.classList.add('active');
 
-        // Combine mock + real players
+        // Filter real players
         let filtered = gender === 'all'
-            ? [...this.mockPlayers, ...this.realPlayers]
-            : [...this.mockPlayers, ...this.realPlayers].filter(p => p.gender === gender);
+            ? [...this.realPlayers]
+            : [...this.realPlayers].filter(p => p.gender === gender);
 
         filtered = filtered.slice(0, 20);
         this.displayProspectsHome(filtered);
@@ -1369,7 +1734,7 @@ class HoopPortalApp {
         const classYear = document.getElementById('filterClassYear')?.value || '';
         const gender = document.getElementById('filterGender')?.value || '';
 
-        const allPlayers = [...this.mockPlayers, ...this.realPlayers];
+        const allPlayers = [...this.realPlayers];
 
         let results = allPlayers.filter(p => {
             if (name && !p.name?.toLowerCase().includes(name.toLowerCase())) return false;
@@ -1448,94 +1813,103 @@ class HoopPortalApp {
         if (container) container.innerHTML = '';
     }
 
-   async showPlayerModal(playerId) {
-    const allPlayers = [...this.mockPlayers, ...this.realPlayers];
-    const player = allPlayers.find(p => String(p.id) === String(playerId));
+    async showPlayerModal(playerId) {
+        const allPlayers = [...this.realPlayers];
+        const player = allPlayers.find(p => String(p.id) === String(playerId));
 
-    if (!player) return;
+        if (!player) return;
 
-    let playerStats = { ppg: null, apg: null, rpg: null, fg: null, '3p': null, spg: null, bpg: null, ft: null, tov: null };
-    let contactInfo = { playerEmail: null, playerPhone: null, parentName: null, parentEmail: null, parentPhone: null };
-    let playerHighlightReels = [];
+        let playerStats = { ppg: null, apg: null, rpg: null, fg: null, '3p': null, spg: null, bpg: null, ft: null, tov: null };
+        let contactInfo = { playerEmail: null, playerPhone: null, parentName: null, parentEmail: null, parentPhone: null };
+        let playerHighlightReels = [];
 
-    if (player.realProfile) {
-        try {
-            // Load stats
-            const { data: statsData } = await supabaseClient
-                .from('player_stats')
-                .select('*')
+        if (this.currentUser) {
+            const { data: likedCheck } = await supabaseClient
+                .from('liked_players')
+                .select('id')
+                .eq('user_id', this.currentUser.id)
                 .eq('player_id', playerId)
                 .maybeSingle();
-            if (statsData) {
-                playerStats = {
-                    ppg: statsData.ppg,
-                    apg: statsData.apg,
-                    rpg: statsData.rpg,
-                    fg: statsData.fg_percent,
-                    '3p': statsData.three_p_percent,
-                    spg: statsData.spg,
-                    bpg: statsData.bpg,
-                    ft: statsData.ft_percent,
-                    tov: statsData.tov
-                };
-            }
+            player.liked = !!likedCheck;
 
-            // Load contact info
-            const { data: contactData } = await supabaseClient
-                .from('player_contact')
-                .select('*')
-                .eq('player_id', playerId)
-                .maybeSingle();
-            if (contactData) {
-                contactInfo.playerEmail = contactData.player_email;
-                contactInfo.playerPhone = contactData.player_phone;
-            }
+            if (player.realProfile) {
+                try {
+                    // Load stats
+                    const { data: statsData } = await supabaseClient
+                        .from('player_stats')
+                        .select('*')
+                        .eq('player_id', playerId)
+                        .maybeSingle();
+                    if (statsData) {
+                        playerStats = {
+                            ppg: statsData.ppg,
+                            apg: statsData.apg,
+                            rpg: statsData.rpg,
+                            fg: statsData.fg_percent,
+                            '3p': statsData.three_p_percent,
+                            spg: statsData.spg,
+                            bpg: statsData.bpg,
+                            ft: statsData.ft_percent,
+                            tov: statsData.tov
+                        };
+                    }
 
-            // Load parent/guardian info
-            const { data: guardians } = await supabaseClient
-                .from('parent_guardians')
-                .select('*')
-                .eq('player_id', playerId);
-            if (guardians && guardians.length > 0) {
-                const parent1 = guardians.find(g => g.parent_number === 1);
-                if (parent1) {
-                    contactInfo.parentName = parent1.name;
-                    contactInfo.parentEmail = parent1.email;
-                    contactInfo.parentPhone = parent1.phone;
+                    // Load contact info
+                    const { data: contactData } = await supabaseClient
+                        .from('player_contact')
+                        .select('*')
+                        .eq('player_id', playerId)
+                        .maybeSingle();
+                    if (contactData) {
+                        contactInfo.playerEmail = contactData.player_email;
+                        contactInfo.playerPhone = contactData.player_phone;
+                    }
+
+                    // Load parent/guardian info
+                    const { data: guardians } = await supabaseClient
+                        .from('parent_guardians')
+                        .select('*')
+                        .eq('player_id', playerId);
+                    if (guardians && guardians.length > 0) {
+                        const parent1 = guardians.find(g => g.parent_number === 1);
+                        if (parent1) {
+                            contactInfo.parentName = parent1.name;
+                            contactInfo.parentEmail = parent1.email;
+                            contactInfo.parentPhone = parent1.phone;
+                        }
+                    }
+
+                    // Load highlight reels
+                    const { data: reelsData } = await supabaseClient
+                        .from('highlight_reels')
+                        .select('*')
+                        .eq('player_id', playerId)
+                        .order('created_at', { ascending: true });
+                    if (reelsData) {
+                        playerHighlightReels = reelsData;
+                    }
+
+                } catch (err) {
+                    console.error('Load player details error:', err);
                 }
             }
 
-            // Load highlight reels
-            const { data: reelsData } = await supabaseClient
-                .from('highlight_reels')
-                .select('*')
-                .eq('player_id', playerId)
-                .order('created_at', { ascending: true });
-            if (reelsData) {
-                playerHighlightReels = reelsData;
-            }
+            let profilePic = player.avatar || player.emoji || '🏀';
+            const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
 
-        } catch (err) {
-            console.error('Load player details error:', err);
-        }
-    }
-
-    let profilePic = player.avatar || player.emoji || '🏀';
-    const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
-
-    // Generate highlight reels HTML
-    let highlightReelsHtml = '';
-    if (playerHighlightReels.length > 0) {
-        highlightReelsHtml = `
+            // Generate highlight reels HTML
+            let highlightReelsHtml = '';
+            if (playerHighlightReels.length > 0) {
+                highlightReelsHtml = `
             <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
                 <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">🎥 Highlight Reels</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
                     ${playerHighlightReels.map(reel => {
-                        const embedUrl = this.getYouTubeEmbedUrl(reel.url);
-                        const title = reel.title || 'Watch Highlight';
-                        if (embedUrl) {
-                            const videoId = embedUrl.match(/embed\/([^?]+)/)?.[1];
-                            return `
+                    const embedUrl = this.getYouTubeEmbedUrl(reel.url);
+                    const title = reel.title || 'Watch Highlight';
+                    if (embedUrl) {
+                        const videoId = embedUrl.match(/embed\/([^?]+)/)?.[1];
+                        return `
                                 <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
                                     <div style="background: #1e2025; border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
                                         <div style="position: relative; background: #000;">
@@ -1550,8 +1924,8 @@ class HoopPortalApp {
                                     </div>
                                 </a>
                             `;
-                        } else {
-                            return `
+                    } else {
+                        return `
                                 <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
                                     <div style="background: #1e2025; border-radius: 12px; padding: 1rem; text-align: center;">
                                         <div style="font-size: 2rem;">🎬</div>
@@ -1559,17 +1933,17 @@ class HoopPortalApp {
                                     </div>
                                 </a>
                             `;
-                        }
-                    }).join('')}
+                    }
+                }).join('')}
                 </div>
             </div>
         `;
-    }
+            }
 
-    // Generate contact info HTML (only show if authenticated user is viewing)
-    let contactHtml = '';
-    if (this.currentUser) {
-        contactHtml = `
+            // Generate contact info HTML (only show if authenticated user is viewing)
+            let contactHtml = '';
+            if (this.currentUser) {
+                contactHtml = `
             <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
                 <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">📞 Contact Information</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -1597,10 +1971,10 @@ class HoopPortalApp {
                 ${!contactInfo.playerEmail && !contactInfo.playerPhone && !contactInfo.parentName ? '<div style="color: var(--text-muted); text-align: center;">No contact information provided</div>' : ''}
             </div>
         `;
-    }
+            }
 
-    const modalBody = document.getElementById('playerModalBody');
-    modalBody.innerHTML = `
+            const modalBody = document.getElementById('playerModalBody');
+            modalBody.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
             <div>
                 <div style="text-align: center; margin-bottom: 1.5rem;">
@@ -1648,12 +2022,12 @@ class HoopPortalApp {
         </div>
     `;
 
-    document.getElementById('playerModal').classList.add('show');
-}
+            document.getElementById('playerModal').classList.add('show');
+        }
+    }
 
     async likePlayer(playerId) {
-        const player = this.mockPlayers.find(p => String(p.id) === String(playerId)) ||
-            this.realPlayers.find(p => String(p.id) === String(playerId));
+        const player = this.realPlayers.find(p => String(p.id) === String(playerId));
 
         if (!player) return;
 
@@ -1662,59 +2036,126 @@ class HoopPortalApp {
             return;
         }
 
-        if (player.liked) {
-            player.liked = false;
-            player.likes = Math.max(0, (player.likes || 0) - 1);
-        } else {
-            player.liked = true;
-            player.likes = (player.likes || 0) + 1;
+        if (!this.currentUser) {
+            this.showNotification("Please log in to like players", 'error');
+            return;
         }
 
-        if (this.currentUser) {
+        try {
             if (player.liked) {
-                if (!this.userLikedPlayers.includes(playerId)) {
-                    this.userLikedPlayers.push(playerId);
-                }
-            } else {
-                const index = this.userLikedPlayers.indexOf(playerId);
-                if (index > -1) {
-                    this.userLikedPlayers.splice(index, 1);
-                }
-            }
-            this.saveUserData();
+                // Unlike: Remove from Supabase
+                const { error } = await supabaseClient
+                    .from('liked_players')
+                    .delete()
+                    .eq('user_id', this.currentUser.id)
+                    .eq('player_id', playerId);
 
-            if (player.realProfile) {
-                await this.saveLikedToSupabase(playerId, player.liked);
-            }
-        } else {
-            const likedPlayers = JSON.parse(localStorage.getItem('hoopportal_liked_players') || '[]');
-            if (player.liked) {
-                if (!likedPlayers.includes(playerId)) {
-                    likedPlayers.push(playerId);
-                }
+                if (error) throw error;
+
+                player.liked = false;
+                player.likes = Math.max(0, (player.likes || 0) - 1);
+                this.showNotification('Player removed from liked list', 'success');
             } else {
-                const index = likedPlayers.indexOf(playerId);
-                if (index > -1) {
-                    likedPlayers.splice(index, 1);
+                // Like: Add to Supabase
+                const { error } = await supabaseClient
+                    .from('liked_players')
+                    .insert({
+                        user_id: this.currentUser.id,
+                        player_id: playerId
+                    });
+
+                if (error) throw error;
+
+                player.liked = true;
+                player.likes = (player.likes || 0) + 1;
+                this.showNotification('Player liked!', 'success');
+            }
+
+            // Update like button in modal if open
+            const likeBtn = document.getElementById('likeBtn');
+            if (likeBtn) {
+                if (player.liked) {
+                    likeBtn.style.backgroundColor = 'var(--primary-orange)';
+                    likeBtn.style.color = 'white';
+                    likeBtn.textContent = `❤️ Liked (${player.likes})`;
+                } else {
+                    likeBtn.style.backgroundColor = '';
+                    likeBtn.style.color = '';
+                    likeBtn.textContent = `🤍 Like (${player.likes})`;
                 }
             }
-            localStorage.setItem('hoopportal_liked_players', JSON.stringify(likedPlayers));
+
+            // Refresh coach liked players if on coach dashboard
+            if (this.currentUser?.userType === 'coach' && window.location.pathname.includes('coach-dashboard.html')) {
+                await this.loadCoachLikedPlayers();
+            }
+
+            // Also refresh the modal's like button if it's open
+            const modal = document.getElementById('playerModal');
+            if (modal && modal.classList.contains('show')) {
+                // Update the liked status in the player object
+                // The button will be updated when modal is reopened
+            }
+
+        } catch (error) {
+            console.error('Like error:', error);
+            this.showNotification(error.message || 'Failed to update like', 'error');
+        }
+    }
+
+    showAllLikedPlayersModal(players, userMap) {
+        // Create or get modal for all liked players
+        let allLikedModal = document.getElementById('allLikedModal');
+        if (!allLikedModal) {
+            allLikedModal = document.createElement('div');
+            allLikedModal.id = 'allLikedModal';
+            allLikedModal.className = 'modal';
+            allLikedModal.innerHTML = `
+            <div class="modal-content modal-large" style="max-width: 800px;">
+                <button class="modal-close">&times;</button>
+                <h2 style="margin-bottom: 1rem;">⭐ Liked Players</h2>
+                <div id="allLikedModalBody" style="max-height: 60vh; overflow-y: auto;"></div>
+            </div>
+        `;
+            document.body.appendChild(allLikedModal);
+
+            // Add close button functionality
+            allLikedModal.querySelector('.modal-close').addEventListener('click', () => {
+                this.closeModal(allLikedModal);
+            });
+            allLikedModal.addEventListener('click', (e) => {
+                if (e.target === allLikedModal) this.closeModal(allLikedModal);
+            });
         }
 
-        const likeBtn = document.getElementById('likeBtn');
-        if (likeBtn) {
-            if (player.liked) {
-                likeBtn.style.backgroundColor = 'var(--primary-orange)';
-                likeBtn.style.color = 'white';
-                likeBtn.textContent = `❤️ Liked (${player.likes})`;
-            } else {
-                likeBtn.style.backgroundColor = '';
-                likeBtn.style.color = '';
-                likeBtn.textContent = `🤍 Like (${player.likes})`;
-            }
-        }
+        const modalBody = document.getElementById('allLikedModalBody');
+        modalBody.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            ${players.map(player => {
+            const name = userMap[player.id] || 'Unknown Player';
+            const roleBadge = this.getRoleBadge(player.position);
+            return `
+                    <div class="liked-player-card" onclick="app.showPlayerModal('${player.id}'); app.closeModal(document.getElementById('allLikedModal'));" style="cursor: pointer;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <h4 style="margin: 0;">${this.escapeHtml(name)}</h4>
+                            ${roleBadge}
+                        </div>
+                        <div style="margin-top: 0.5rem;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                ${player.position || 'No position'} • ${player.class_year || 'No class'}
+                            </div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                ${player.city || ''} ${player.state || ''}
+                            </div>
+                            ${player.height ? `<div style="font-size: 0.85rem;">${player.height} | ${player.weight ? player.weight + ' lbs' : ''}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+        }).join('')}
+        </div>
+    `;
 
-        this.showNotification(player.liked ? 'Player liked!' : 'Like removed', 'success');
+        allLikedModal.classList.add('show');
     }
 
     async saveLikedToSupabase(playerId, isLiked) {
@@ -1722,12 +2163,22 @@ class HoopPortalApp {
 
         try {
             if (isLiked) {
-                await supabaseClient
+                // Check if already liked to avoid duplicates
+                const { data: existing } = await supabaseClient
                     .from('liked_players')
-                    .insert({
-                        user_id: this.currentUser.id,
-                        player_id: playerId
-                    });
+                    .select('id')
+                    .eq('user_id', this.currentUser.id)
+                    .eq('player_id', playerId)
+                    .maybeSingle();
+
+                if (!existing) {
+                    await supabaseClient
+                        .from('liked_players')
+                        .insert({
+                            user_id: this.currentUser.id,
+                            player_id: playerId
+                        });
+                }
             } else {
                 await supabaseClient
                     .from('liked_players')
@@ -1735,11 +2186,11 @@ class HoopPortalApp {
                     .eq('user_id', this.currentUser.id)
                     .eq('player_id', playerId);
             }
+            console.log('Like saved to Supabase:', playerId, isLiked);
         } catch (error) {
             console.error('Save liked error:', error);
         }
     }
-
     addHighlightField() {
         if (!this.currentUser) {
             this.showNotification('Please log in first', 'error');
@@ -2109,22 +2560,59 @@ class HoopPortalApp {
             return m;
         });
     }
-
-    selectPlan(plan) {
+    // Add this to your app.js - this will call your Netlify function
+    async selectPlan(plan) {
         if (!this.currentUser) {
             this.showNotification('Please log in first to select a plan', 'error');
             this.showSignupModal();
             return;
         }
 
-        this.currentUser.subscription = plan;
-        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+        // Price IDs - replace with your actual Stripe Price IDs
+        const priceIds = {
+            basic: 'price_1TZHdpPv1yKOz6gv9mvr8OPS',
+            premium: 'price_1TZHeNPv1yKOz6gvZ7hotmwm'
+        };
 
-        const planName = plan === 'basic' ? 'Basic ($1.99/month)' : 'Premium ($4.99/month)';
-        const clips = plan === 'basic' ? '2' : '5';
+        const priceId = priceIds[plan];
 
-        this.showNotification(`You've selected the ${planName} plan! You can now add up to ${clips} highlight reels.`, 'success');
-        setTimeout(() => window.location.href = 'profile.html', 1500);
+        if (!priceId || priceId.includes('placeholder')) {
+            // Fallback to mock mode (no Stripe)
+            this.mockSelectPlan(plan);
+            return;
+        }
+
+        this.showNotification('Redirecting to checkout...', 'success');
+
+        try {
+            // Call your Netlify function
+            const response = await fetch('/.netlify/functions/create-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    priceId: priceId,
+                    userId: this.currentUser.id,
+                    userEmail: this.currentUser.email,
+                    planType: plan,
+                    successUrl: `${window.location.origin}/profile.html`,
+                    cancelUrl: `${window.location.origin}/plans.html`
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.url) {
+                // Redirect to Stripe Checkout
+                window.location.href = data.url;
+            } else {
+                this.showNotification('Failed to create checkout session', 'error');
+            }
+        } catch (error) {
+            console.error('Checkout error:', error);
+            this.showNotification('Failed to start checkout. Please try again.', 'error');
+        }
     }
 
     closeModal(modal) {
@@ -2180,16 +2668,21 @@ class HoopPortalApp {
         setTimeout(() => notification.remove(), 5000);
     }
 
+    // Update loadPageContent to handle coach dashboard
     loadPageContent() {
         const path = window.location.pathname.split('/').pop() || 'index.html';
 
-        if (window.location.hash === '#') {
-            return;
-        }
-
-        if (path.includes('index.html') || path === '') {
-            // Show mock players on home page
-            this.displayProspectsHome(this.mockPlayers.slice(0, 20));
+        if (path.includes('coach-dashboard.html')) {
+            if (this.currentUser?.userType === 'coach') {
+                this.loadCoachProfile();
+                this.loadCoachLikedPlayers();
+                document.getElementById('coachInfoForm')?.addEventListener('submit', (e) => this.handleCoachInfo(e));
+                document.getElementById('coachContactForm')?.addEventListener('submit', (e) => this.handleCoachContact(e));
+            } else if (this.currentUser?.userType === 'player') {
+                window.location.href = 'profile.html';
+            }
+        } else if (path.includes('index.html') || path === '') {
+            this.displayProspectsHome(this.realPlayers.slice(0, 20));
         } else if (path.includes('search.html')) {
             // Will populate on search
         } else if (path.includes('profile.html')) {

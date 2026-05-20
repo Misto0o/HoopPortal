@@ -375,15 +375,15 @@
                             <h3>Subscription</h3>
                             <div class="subscription-status">
                                 <div class="status-item">
+                                    <span class="status-label">Plan</span>
+                                    <span class="status-value" id="subPlan">Loading...</span>
+                                </div>
+                                <div class="status-item">
                                     <span class="status-label">Status</span>
                                     <span class="status-value" id="subStatus">Active</span>
                                 </div>
-                                <div class="status-item">
-                                    <span class="status-label">Profile Visible</span>
-                                    <span class="status-value" id="subVisible">Yes</span>
-                                </div>
                             </div>
-                            <button class="btn btn-primary btn-small">Upgrade to Premium</button>
+                            <button class="btn btn-primary btn-small" id="managePlanBtn">Upgrade to Premium</button>
                         </div>
 
                         <!-- Boost Recruitment Card -->
@@ -401,6 +401,7 @@
     </section>
     <script src="/extras/navbar.js"></script>
     <script src="/js/app.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
 </body>
 
 </html>

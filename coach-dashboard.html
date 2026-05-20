@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Dashboard - HoopPortal</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/profile.css">
+    <link rel="stylesheet" href="/extras/navbar.css">
+    <link rel="stylesheet" href="/css/modals.css">
+    <style>
+        .coach-badge {
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f2b44 100%);
+            border: 1px solid #2c5a8c;
+            color: #7ab7e0;
+        }
+
+        .coach-card {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .liked-players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .liked-player-card {
+            background: var(--secondary-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .liked-player-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-orange);
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-head {
+            background: #dc2626;
+            color: white;
+        }
+
+        .role-assistant {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .role-jv {
+            background: #10b981;
+            color: white;
+        }
+
+        .role-freshman {
+            background: #6366f1;
+            color: white;
+        }
+
+        .role-scout {
+            background: #8b5cf6;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="profile-section">
+        <div class="section-container">
+            <div class="profile-header">
+                <div>
+                    <h1>Coach Dashboard</h1>
+                    <p class="profile-subtitle">Manage your profile and discover talent</p>
+                </div>
+                <div class="coach-badge" style="padding: 8px 16px; border-radius: 30px;">
+                    🏀 COACH ACCOUNT
+                </div>
+            </div>
+
+            <div class="profile-wrapper">
+                <div class="profile-forms">
+                    <!-- Basic Info Card -->
+                    <div class="profile-card">
+                        <h2>Coach Information</h2>
+                        <form id="coachInfoForm" class="profile-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>First Name *</label>
+                                    <input type="text" id="coachFirstName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Last Name *</label>
+                                    <input type="text" id="coachLastName" required>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>School/Organization *</label>
+                                <input type="text" id="coachSchool" required
+                                    placeholder="e.g., Highpoint Central High School">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Team/Program Name</label>
+                                <input type="text" id="coachTeam" placeholder="e.g., Varsity Girls Basketball">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Role *</label>
+                                    <select id="coachRole" required>
+                                        <option value="">Select Role</option>
+                                        <option value="head">Head Coach</option>
+                                        <option value="assistant">Assistant Coach</option>
+                                        <option value="jv">JV Coach</option>
+                                        <option value="freshman">Freshman Coach</option>
+                                        <option value="scout">Recruiting Coordinator/Scout</option>
+                                        <option value="trainer">Skills Trainer</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Years of Experience</label>
+                                    <input type="number" id="coachExperience" placeholder="Years coaching">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>City</label>
+                                    <input type="text" id="coachCity" placeholder="City">
+                                </div>
+                                <div class="form-group">
+                                    <label>State</label>
+                                    <select id="coachState">
+                                        <option value="">Select State</option>
+                                        <option value="AL">Alabama</option>
+                                        <option value="AK">Alaska</option>
+                                        <option value="AZ">Arizona</option>
+                                        <option value="AR">Arkansas</option>
+                                        <option value="CA">California</option>
+                                        <option value="CO">Colorado</option>
+                                        <option value="CT">Connecticut</option>
+                                        <option value="DE">Delaware</option>
+                                        <option value="FL">Florida</option>
+                                        <option value="GA">Georgia</option>
+                                        <option value="HI">Hawaii</option>
+                                        <option value="ID">Idaho</option>
+                                        <option value="IL">Illinois</option>
+                                        <option value="IN">Indiana</option>
+                                        <option value="IA">Iowa</option>
+                                        <option value="KS">Kansas</option>
+                                        <option value="KY">Kentucky</option>
+                                        <option value="LA">Louisiana</option>
+                                        <option value="ME">Maine</option>
+                                        <option value="MD">Maryland</option>
+                                        <option value="MA">Massachusetts</option>
+                                        <option value="MI">Michigan</option>
+                                        <option value="MN">Minnesota</option>
+                                        <option value="MS">Mississippi</option>
+                                        <option value="MO">Missouri</option>
+                                        <option value="MT">Montana</option>
+                                        <option value="NE">Nebraska</option>
+                                        <option value="NV">Nevada</option>
+                                        <option value="NH">New Hampshire</option>
+                                        <option value="NJ">New Jersey</option>
+                                        <option value="NM">New Mexico</option>
+                                        <option value="NY">New York</option>
+                                        <option value="NC">North Carolina</option>
+                                        <option value="ND">North Dakota</option>
+                                        <option value="OH">Ohio</option>
+                                        <option value="OK">Oklahoma</option>
+                                        <option value="OR">Oregon</option>
+                                        <option value="PA">Pennsylvania</option>
+                                        <option value="RI">Rhode Island</option>
+                                        <option value="SC">South Carolina</option>
+                                        <option value="SD">South Dakota</option>
+                                        <option value="TN">Tennessee</option>
+                                        <option value="TX">Texas</option>
+                                        <option value="UT">Utah</option>
+                                        <option value="VT">Vermont</option>
+                                        <option value="VA">Virginia</option>
+                                        <option value="WA">Washington</option>
+                                        <option value="WV">West Virginia</option>
+                                        <option value="WI">Wisconsin</option>
+                                        <option value="WY">Wyoming</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Coach Bio / Philosophy</label>
+                                <textarea id="coachBio" rows="4"
+                                    placeholder="Tell players about your coaching philosophy, program culture, and what you're looking for..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Save Coach Info</button>
+                        </form>
+                    </div>
+
+                    <!-- Contact Info Card -->
+                    <div class="profile-card">
+                        <h2>Contact Information</h2>
+                        <form id="coachContactForm" class="profile-form">
+                            <div class="form-group">
+                                <label>Work Email *</label>
+                                <input type="email" id="coachEmail" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" id="coachPhone">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Contact Info</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="profile-sidebar">
+                    <!-- Liked Players Card -->
+                    <div class="stats-card">
+                        <h3>⭐ Liked Players</h3>
+                        <p class="premium-notice">Players you're interested in recruiting</p>
+                        <div id="likedPlayersContainer" class="liked-players-grid">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                        <div id="viewAllButtonContainer" style="text-align: center; margin-top: 1rem;">
+                            <!-- View All button will appear here -->
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats Card -->
+                    <div class="stats-card">
+                        <h3>Recruiting Activity</h3>
+                        <div class="stat-grid">
+                            <div class="stat-box">
+                                <div class="stat-label">Players Liked</div>
+                                <div class="stat-value" id="likedCount">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">Profiles Viewed</div>
+                                <div class="stat-value" id="viewedCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tip Card -->
+                    <div class="stats-card boost-card">
+                        <h3>Recruiting Tips</h3>
+                        <ul class="boost-list">
+                            <li>⭐ Like players to save them to your recruiting list</li>
+                            <li>📞 Contact info appears when you like a player</li>
+                            <li>🎥 Watch highlight reels to evaluate talent</li>
+                            <li>📊 Check stats to compare prospects</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="playerModal" class="modal">
+        <div class="modal-content modal-large">
+            <button class="modal-close">&times;</button>
+            <div id="playerModalBody"></div>
+        </div>
+    </div>
+
+    <script src="/extras/navbar.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+
+</html>
