@@ -1,10 +1,14 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { createClient } = require('@supabase/supabase-js');
+// ============================================
+// netlify/functions/verify-session.js
+// NO NPM REQUIRED - Uses Stripe API directly
+// ============================================
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// NOTE: This function requires Supabase module
+// BUT you can skip this function entirely if you want
+// The webhook handles the payment verification
+
+// For now, we'll make it simpler - just verify with Stripe API
+// You'll need to handle Supabase separately or skip this
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') {
@@ -26,10 +30,26 @@ exports.handler = async (event) => {
             };
         }
 
-        // Retrieve the session
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+        if (!stripeSecretKey) {
+            return {
+                statusCode: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Stripe key not configured' })
+            };
+        }
 
-        if (!session) {
+        // Retrieve the session from Stripe
+        const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${stripeSecretKey}`
+            }
+        });
+
+        const session = await response.json();
+
+        if (session.error) {
             return {
                 statusCode: 404,
                 headers: { 'Content-Type': 'application/json' },
@@ -46,40 +66,19 @@ exports.handler = async (event) => {
             };
         }
 
-        // If payment succeeded, update database
+        // If payment succeeded
         if (session.payment_status === 'paid') {
-            const { data: existingUser } = await supabase
-                .from('user_profiles')
-                .select('subscription')
-                .eq('id', userId)
-                .single();
-
-            if (existingUser && existingUser.subscription !== session.metadata.plan_type) {
-                await supabase
-                    .from('user_profiles')
-                    .update({
-                        subscription: session.metadata.plan_type,
-                        subscription_status: 'active',
-                        stripe_customer_id: session.customer,
-                        subscription_id: session.subscription,
-                        updated_at: new Date()
-                    })
-                    .eq('id', userId);
-
-                if (session.metadata.plan_type === 'premium') {
-                    await supabase
-                        .from('player_profiles')
-                        .update({ is_premium: true })
-                        .eq('id', userId);
-                }
-            }
-
+            // NOTE: Updating Supabase requires the module
+            // The webhook will handle the DB update instead
+            // This function just confirms payment status
+            
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     success: true,
-                    plan: session.metadata.plan_type
+                    plan: session.metadata.plan_type,
+                    status: session.payment_status
                 })
             };
         }
