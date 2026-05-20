@@ -25,7 +25,7 @@ async function initializeSupabase() {
 class HoopPortalApp {
     constructor() {
         this.currentUser = null;
-        this.mockPlayers = []; // Mock players disabled - using real players only
+        this.mockPlayers = this.generateMockPlayers(); // 25 mock players for testing
         this.realPlayers = [];
         this.playerStats = {};
         this.userLikedPlayers = [];
@@ -1236,16 +1236,81 @@ class HoopPortalApp {
     }
 
     // ============================================
+    // GENERATE MOCK PLAYERS (25 players)
+    // ============================================
+    generateMockPlayers() {
+        const ncPlayers = [
+            { name: 'Marcus Johnson', position: 'PG', height: "6'1\"", weight: 185, school: 'Lincoln High', city: 'Charlotte', state: 'NC', classYear: 2027, ppg: 18.5, apg: 7.2, rpg: 3.1 },
+            { name: 'DeAndre Williams', position: 'SG', height: "6'3\"", weight: 195, school: 'West Charlotte High', city: 'Charlotte', state: 'NC', classYear: 2026, ppg: 22.1, apg: 5.3, rpg: 4.2 },
+            { name: 'Malik Davis', position: 'SF', height: "6'6\"", weight: 215, school: 'Riverside High', city: 'Durham', state: 'NC', classYear: 2027, ppg: 19.4, apg: 4.1, rpg: 7.3 },
+            { name: 'Jamal Robinson', position: 'PF', height: "6'8\"", weight: 240, school: 'Raleigh Central', city: 'Raleigh', state: 'NC', classYear: 2026, ppg: 17.8, apg: 2.5, rpg: 10.2 },
+            { name: 'Tyrone Jackson', position: 'C', height: "6'10\"", weight: 260, school: 'Greensboro Academy', city: 'Greensboro', state: 'NC', classYear: 2027, ppg: 15.2, apg: 1.8, rpg: 12.5 },
+            { name: 'Brandon Lee', position: 'PG', height: "6'0\"", weight: 175, school: 'Chapel Hill High', city: 'Chapel Hill', state: 'NC', classYear: 2028, ppg: 20.3, apg: 8.1, rpg: 2.9 },
+            { name: 'Antonio Martinez', position: 'SG', height: "6'4\"", weight: 205, school: 'Winston-Salem Prep', city: 'Winston-Salem', state: 'NC', classYear: 2026, ppg: 24.7, apg: 6.2, rpg: 5.1 },
+            { name: 'Isaiah Thompson', position: 'SF', height: "6'7\"", weight: 220, school: 'Wilmington High', city: 'Wilmington', state: 'NC', classYear: 2027, ppg: 18.9, apg: 3.7, rpg: 6.8 },
+            { name: 'Jaylen Brown', position: 'PF', height: "6'9\"", weight: 235, school: 'Fayetteville Academy', city: 'Fayetteville', state: 'NC', classYear: 2026, ppg: 16.5, apg: 2.3, rpg: 9.4 },
+            { name: 'Kevin Hart', position: 'C', height: "6'11\"", weight: 265, school: 'Asheville High', city: 'Asheville', state: 'NC', classYear: 2028, ppg: 14.2, apg: 1.9, rpg: 11.8 },
+        ];
+
+        const outOfStatePlayer = [
+            { name: 'Zion Williams', position: 'PG', height: "6'2\"", weight: 190, school: 'Atlanta Prep', city: 'Atlanta', state: 'GA', classYear: 2027, ppg: 21.5, apg: 7.8, rpg: 3.5 },
+            { name: 'LeBron Jones', position: 'SG', height: "6'5\"", weight: 210, school: 'Miami High', city: 'Miami', state: 'FL', classYear: 2026, ppg: 23.2, apg: 5.9, rpg: 4.8 },
+            { name: 'Kobe Davis', position: 'SF', height: "6'7\"", weight: 225, school: 'Charleston Academy', city: 'Charleston', state: 'SC', classYear: 2027, ppg: 20.1, apg: 4.3, rpg: 7.1 },
+            { name: 'Stephen Curry', position: 'PG', height: "6'1\"", weight: 180, school: 'Richmond High', city: 'Richmond', state: 'VA', classYear: 2026, ppg: 25.4, apg: 8.7, rpg: 3.2 },
+            { name: 'Giannis Antetokounmpo', position: 'PF', height: "6'10\"", weight: 250, school: 'Nashville Academy', city: 'Nashville', state: 'TN', classYear: 2027, ppg: 18.9, apg: 2.7, rpg: 11.3 },
+            { name: 'Donovan Mitchell', position: 'SG', height: "6'3\"", weight: 200, school: 'Columbia High', city: 'Columbia', state: 'SC', classYear: 2026, ppg: 22.8, apg: 6.1, rpg: 4.5 },
+            { name: 'Damian Lillard', position: 'PG', height: "6'2\"", weight: 195, school: 'Birmingham Academy', city: 'Birmingham', state: 'AL', classYear: 2028, ppg: 19.6, apg: 7.4, rpg: 3.8 },
+            { name: 'Kyrie Irving', position: 'PG', height: "6'0\"", weight: 175, school: 'New Orleans High', city: 'New Orleans', state: 'LA', classYear: 2027, ppg: 24.1, apg: 8.9, rpg: 2.9 },
+            { name: 'Jayson Tatum', position: 'SF', height: "6'8\"", weight: 230, school: 'Memphis Prep', city: 'Memphis', state: 'TN', classYear: 2026, ppg: 21.5, apg: 3.9, rpg: 8.2 },
+            { name: 'Luka Doncic', position: 'PF', height: "6'7\"", weight: 235, school: 'Phoenix Academy', city: 'Phoenix', state: 'AZ', classYear: 2027, ppg: 20.3, apg: 4.1, rpg: 9.1 },
+            { name: 'Paolo Banchero', position: 'PF', height: "6'9\"", weight: 250, school: 'Dallas High', city: 'Dallas', state: 'TX', classYear: 2026, ppg: 17.4, apg: 2.6, rpg: 10.5 },
+            { name: 'Victor Wembanyama', position: 'C', height: "7'0\"", weight: 260, school: 'Houston Academy', city: 'Houston', state: 'TX', classYear: 2028, ppg: 16.1, apg: 2.2, rpg: 12.8 },
+            { name: 'Evan Bouchard', position: 'SG', height: "6'4\"", weight: 208, school: 'Denver Prep', city: 'Denver', state: 'CO', classYear: 2027, ppg: 23.5, apg: 5.8, rpg: 4.9 },
+            { name: 'Tyler Herro', position: 'SG', height: "6'5\"", weight: 215, school: 'Milwaukee Academy', city: 'Milwaukee', state: 'WI', classYear: 2026, ppg: 21.9, apg: 6.3, rpg: 5.2 },
+            { name: 'Devin Booker', position: 'SG', height: "6'6\"", weight: 220, school: 'Cleveland High', city: 'Cleveland', state: 'OH', classYear: 2027, ppg: 22.7, apg: 5.5, rpg: 5.8 },
+        ];
+
+        const allPlayers = [...ncPlayers, ...outOfStatePlayer];
+
+        return allPlayers.map((p, idx) => ({
+            id: idx + 1,
+            name: p.name,
+            gender: 'boys',
+            position: p.position,
+            height: p.height,
+            weight: parseInt(p.weight),
+            school: p.school,
+            city: p.city,
+            state: p.state,
+            classYear: p.classYear,
+            premium: idx % 4 === 0,
+            emoji: '🏀',
+            likes: Math.floor(Math.random() * 200) + 50,
+            liked: false,
+            description: `Talented ${p.position} with strong court vision and ball handling skills.`,
+            coachType: 'Competitive program focused on development',
+            ppg: p.ppg,
+            apg: p.apg,
+            rpg: p.rpg,
+            fg: Math.round((Math.random() * 15 + 40) * 10) / 10,
+            '3p': Math.round((Math.random() * 15 + 25) * 10) / 10,
+            spg: Math.round((Math.random() * 2 + 1) * 10) / 10,
+            bpg: Math.round((Math.random() * 2 + 0.5) * 10) / 10,
+            ft: Math.round((Math.random() * 15 + 70) * 10) / 10
+        }));
+    }
+
+    // ============================================
     // PROSPECTS
     // ============================================
     filterProspectsHome(gender, event) {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         if (event && event.target) event.target.classList.add('active');
 
-        // Use real players only
+        // Combine mock + real players
         let filtered = gender === 'all'
-            ? this.realPlayers
-            : this.realPlayers.filter(p => p.gender === gender);
+            ? [...this.mockPlayers, ...this.realPlayers]
+            : [...this.mockPlayers, ...this.realPlayers].filter(p => p.gender === gender);
 
         filtered = filtered.slice(0, 20);
         this.displayProspectsHome(filtered);
@@ -1663,8 +1728,8 @@ class HoopPortalApp {
         }
 
         if (path.includes('index.html') || path === '') {
-            // Show real players only (mock players removed)
-            this.displayProspectsHome(this.realPlayers.slice(0, 20));
+            // Show mock players on home page
+            this.displayProspectsHome(this.mockPlayers.slice(0, 20));
         } else if (path.includes('search.html')) {
             // Will populate on search
         } else if (path.includes('profile.html')) {
