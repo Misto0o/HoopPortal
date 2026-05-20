@@ -1,0 +1,327 @@
+/* ========== HERO SECTION ========== */
+.hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-dark);
+    position: relative;
+    overflow: hidden;
+    padding: 2rem;
+}
+
+.hero-content {
+    text-align: center;
+    z-index: 2;
+    max-width: 900px;
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    background-color: transparent;
+    border: 2px solid var(--primary-orange);
+    padding: 0.8rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    color: var(--primary-orange);
+    margin-bottom: 2rem;
+    font-weight: 600;
+}
+
+.badge-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--primary-orange);
+}
+
+.hero-title {
+    font-size: 4.5rem;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    letter-spacing: -1px;
+}
+
+.hero-subtitle {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-bottom: 3rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    font-weight: 400;
+}
+
+.hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.stat {
+    animation: fadeInUp 0.8s ease-out;
+    animation-fill-mode: backwards;
+}
+
+.stat:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.stat:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--primary-orange);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* ========== BROWSE SECTION ========== */
+.browse-section {
+    padding: 4rem 2rem;
+    background-color: var(--primary-dark);
+}
+
+.section-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 900;
+}
+
+.section-header p {
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+/* ========== FILTER TABS ========== */
+.filter-tabs {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+}
+
+.filter-tab {
+    padding: 0.8rem 1.5rem;
+    background-color: transparent;
+    border: 2px solid var(--border-color);
+    color: var(--text-light);
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-tab:hover,
+.filter-tab.active {
+    background-color: var(--primary-orange);
+    border-color: var(--primary-orange);
+    color: white;
+}
+
+/* ========== PROSPECTS GRID ========== */
+.prospects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.prospect-card-home {
+    background-color: var(--tertiary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.prospect-card-home:hover {
+    border-color: var(--primary-orange);
+    transform: translateY(-8px);
+    box-shadow: var(--card-shadow);
+}
+
+.prospect-card-home.premium::before {
+    content: '⭐ PREMIUM';
+    display: block;
+    background-color: var(--primary-orange);
+    color: white;
+    padding: 0.6rem;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.prospect-avatar {
+    width: 100%;
+    height: auto;
+    background-color: var(--secondary-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+}
+
+.prospect-card-content {
+    padding: 1.5rem;
+}
+
+.prospect-card-content h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.prospect-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+/* ========== PROSPECT SECTION ========== */
+.prospect-section {
+    padding: 4rem 2rem;
+    background-color: var(--secondary-dark);
+}
+
+.prospect-section h2 {
+    font-size: 2.8rem;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 1rem;
+    letter-spacing: -0.5px;
+}
+
+.prospect-section > p {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 3rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.prospect-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.prospect-card {
+    background-color: var(--tertiary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.prospect-card:hover {
+    border-color: var(--primary-orange);
+    transform: translateY(-8px);
+    box-shadow: var(--card-shadow);
+}
+
+.card-icon {
+    width: 60px;
+    height: 60px;
+    background-color: var(--secondary-dark);
+    border: 2px solid var(--primary-orange);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.card-icon svg {
+    width: 32px;
+    height: 32px;
+    color: var(--primary-orange);
+}
+
+.prospect-card h3 {
+    font-size: 1.4rem;
+    margin-bottom: 0.8rem;
+    font-weight: 700;
+}
+
+.prospect-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+
+    .hero-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .prospects-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 1.8rem;
+        letter-spacing: 0;
+    }
+
+    .hero-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .prospect-section h2 {
+        font-size: 2rem;
+    }
+
+    .section-header h2 {
+        font-size: 1.8rem;
+    }
+}

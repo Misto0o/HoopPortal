@@ -1,4 +1,4 @@
-/* Search Section */
+/* ========== SEARCH SECTION ========== */
 .search-section {
     padding: 3rem 2rem;
     min-height: 100vh;
@@ -22,7 +22,6 @@
     font-size: 1.1rem;
 }
 
-/* Search Filters */
 .search-filters {
     background-color: var(--tertiary-dark);
     border: 1px solid var(--border-color);
@@ -65,17 +64,12 @@
     box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
 }
 
-.filter-group input::placeholder {
-    color: var(--text-muted);
-}
-
 #searchBtn,
 #resetBtn {
     align-self: flex-end;
     margin-top: 1.5rem;
 }
 
-/* Search Results */
 .search-results {
     margin-top: 3rem;
 }
@@ -182,4 +176,36 @@
 .detail-value {
     font-weight: 600;
     color: var(--text-light);
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+@media (max-width: 768px) {
+    .search-filters {
+        grid-template-columns: 1fr;
+    }
+
+    #searchBtn,
+    #resetBtn {
+        align-self: auto;
+    }
+
+    .prospect-item {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .prospect-item-avatar {
+        width: 100px;
+        height: 100px;
+    }
+
+    .prospect-item-details {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .search-header h1 {
+        font-size: 1.8rem;
+    }
 }

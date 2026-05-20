@@ -1,4 +1,6 @@
-/* Navigation Bar */
+/* ========== NAVIGATION BAR ========== */
+@import url('../css/variables.css');
+
 .navbar {
     background-color: var(--primary-dark);
     border-bottom: 1px solid var(--border-color);

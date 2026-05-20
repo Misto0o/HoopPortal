@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Dashboard - HoopPortal</title>
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/extras/navbar.css">
     <link rel="stylesheet" href="/css/components.css">
-    <link rel="stylesheet" href="/css/utilities.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/extras/navbar.css">
 </head>
 
 <body>
@@ -60,10 +60,6 @@
                         <span class="stat-label">Rebounds / Game</span>
                         <span class="stat-value">--</span>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-label">GPA</span>
-                        <span class="stat-value">--</span>
-                    </div>
                 </div>
 
                 <!-- Highlights Card -->
@@ -75,7 +71,7 @@
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Max Videos</span>
-                        <span class="stat-value" id="maxVideos">2</span>
+                        <span class="stat-value" id="maxVideos">3</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Coach Watches</span>
@@ -88,74 +84,142 @@
                     </div>
                 </div>
             </div>
-
             <!-- Profile Management Section -->
             <div style="margin-top: 4rem;">
-                <h2 style="margin-bottom: 2rem; font-size: 1.8rem; font-weight: 900;">Player Profile</h2>
+                <h2 style="margin-bottom: 2rem; font-size: 1.8rem; font-weight: 900;">
+                    Player Profile
+                </h2>
 
                 <div class="dashboard-card" style="max-width: 100%;">
                     <h3>Keep your info current to attract coaches</h3>
 
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                    <div style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 2rem;
+                margin-top: 2rem;
+            ">
+
                         <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Current
-                                School</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="schoolDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Transfer
-                                School</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;">--</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Full Name</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="nameDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Position</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="positionDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Height</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="heightDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Weight (lbs)
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Current School
                             </p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="weightDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">GPA</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="gpaDisplay">Not set</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Class Year
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="schoolDisplay">
+                                Not set
                             </p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="classDisplay">Not set</p>
                         </div>
+
                         <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">City</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="cityDisplay">Not set</p>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Transfer School
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="transferSchoolDisplay">
+                                --
+                            </p>
                         </div>
+
                         <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">State</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;" id="stateDisplay">Not set</p>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Full Name
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="nameDisplay">
+                                Not set
+                            </p>
                         </div>
+
                         <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Points Per
-                                Game</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;">--</p>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Position
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="positionDisplay">
+                                Not set
+                            </p>
                         </div>
+
                         <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Assists Per
-                                Game</p>
-                            <p style="font-weight: 600; font-size: 1.1rem;">--</p>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Height
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="heightDisplay">
+                                Not set
+                            </p>
                         </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Weight (lbs)
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="weightDisplay">
+                                Not set
+                            </p>
+                        </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Class Year
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="classDisplay">
+                                Not set
+                            </p>
+                        </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                City
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="cityDisplay">
+                                Not set
+                            </p>
+                        </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                State
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="stateDisplay">
+                                Not set
+                            </p>
+                        </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Points Per Game
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="ppgDisplay">
+                                --
+                            </p>
+                        </div>
+
+                        <div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Assists Per Game
+                            </p>
+
+                            <p style="font-weight: 600; font-size: 1.1rem;" id="apgDisplay">
+                                --
+                            </p>
+                        </div>
+
                     </div>
 
-                    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                        <a href="profile.html" class="btn btn-primary">Edit Profile</a>
+                    <div style="
+                margin-top: 2rem;
+                padding-top: 1.5rem;
+                border-top: 1px solid var(--border-color);
+            ">
+                        <a href="profile.html" class="btn btn-primary">
+                            Edit Profile
+                        </a>
                     </div>
                 </div>
             </div>
@@ -231,44 +295,131 @@
         </div>
     </section>
 
-    <!-- Modals -->
-    <div id="authModal" class="modal">
-        <div class="modal-content">
-            <button class="modal-close">&times;</button>
-            <div id="modalBody"></div>
-        </div>
-    </div>
-
     <script src="/extras/navbar.js"></script>
     <script src="/js/app.js"></script>
     <script>
-        // Load dashboard data on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const user = localStorage.getItem('hoopportal_user');
-            if (!user) {
+        let dashboardSupabase = null;
+
+        async function initDashboardSupabase() {
+            // Reuse the Supabase client from app.js if available
+            if (window.supabaseClient) {
+                dashboardSupabase = window.supabaseClient;
+                return dashboardSupabase;
+            }
+
+            // Otherwise create our own
+            if (!window.supabase) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+                await new Promise((resolve) => {
+                    script.onload = resolve;
+                    document.head.appendChild(script);
+                });
+            }
+            const { createClient } = window.supabase;
+            const SUPABASE_URL = 'https://hpuikheuntquldqdewbr.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwdWlraGV1bnRxdWxkcWRld2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNDc2MTQsImV4cCI6MjA5NDcyMzYxNH0.GVkICFVA3QOkZaYqf-MSag2yhCt68-M2QLGpi7_E0UA';
+            dashboardSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            return dashboardSupabase;
+        }
+
+        async function loadDashboardData() {
+            // Get user from localStorage
+            const userStr = localStorage.getItem('hoopportal_user');
+            if (!userStr) {
                 window.location.href = 'index.html';
                 return;
             }
 
-            const userData = JSON.parse(user);
-            const basicInfo = userData.basicInfo || {};
+            const user = JSON.parse(userStr);
+            const userId = user.id;
 
-            // Update display fields
-            document.getElementById('subStatus').textContent = userData.subscription === 'premium' ? 'Premium' : 'Basic';
-            document.getElementById('maxVideos').textContent = userData.subscription === 'premium' ? '5' : '2';
-            document.getElementById('statusDisplay').textContent = userData.subscription ? 'Active' : 'Inactive';
-            document.getElementById('activeSince').textContent = new Date(userData.createdAt).toLocaleDateString();
+            // Initialize Supabase if not already done
+            if (!dashboardSupabase) {
+                try {
+                    await initDashboardSupabase();
+                } catch (error) {
+                    console.error('Failed to initialize Supabase:', error);
+                    return;
+                }
+            }
 
-            document.getElementById('nameDisplay').textContent = basicInfo.firstName ? `${basicInfo.firstName} ${basicInfo.lastName}` : 'Not set';
-            document.getElementById('schoolDisplay').textContent = basicInfo.school || 'Not set';
-            document.getElementById('positionDisplay').textContent = basicInfo.position || 'Not set';
-            document.getElementById('heightDisplay').textContent = basicInfo.height || 'Not set';
-            document.getElementById('weightDisplay').textContent = basicInfo.weight || 'Not set';
-            document.getElementById('gpaDisplay').textContent = basicInfo.gpa || 'Not set';
-            document.getElementById('classDisplay').textContent = basicInfo.classYear || 'Not set';
-            document.getElementById('cityDisplay').textContent = basicInfo.city || 'Not set';
-            document.getElementById('stateDisplay').textContent = basicInfo.state || 'Not set';
-        });
+            try {
+                // DIRECTLY query Supabase tables
+                const { data: playerData, error: playerError } = await dashboardSupabase
+                    .from('player_profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                const { data: statsData, error: statsError } = await dashboardSupabase
+                    .from('player_stats')
+                    .select('*')
+                    .eq('player_id', userId)
+                    .maybeSingle();
+
+                const { data: userProfileData, error: userError } = await dashboardSupabase
+                    .from('user_profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                console.log('Player Data:', playerData, playerError);
+                console.log('Stats Data:', statsData, statsError);
+                console.log('User Profile Data:', userProfileData, userError);
+
+                // Fill HTML with actual table data
+                document.getElementById('nameDisplay').textContent = 
+                    userProfileData ? `${userProfileData.first_name || ''} ${userProfileData.last_name || ''}`.trim() || 'Not set' : 'Not set';
+
+                document.getElementById('schoolDisplay').textContent = 
+                    playerData?.school || 'Not set';
+
+                document.getElementById('transferSchoolDisplay').textContent = 
+                    playerData?.transfer_school || '--';
+
+                document.getElementById('positionDisplay').textContent = 
+                    playerData?.position || 'Not set';
+
+                document.getElementById('heightDisplay').textContent = 
+                    playerData?.height || 'Not set';
+
+                document.getElementById('weightDisplay').textContent = 
+                    playerData?.weight ? `${playerData.weight} lbs` : 'Not set';
+
+                document.getElementById('classDisplay').textContent = 
+                    playerData?.class_year || 'Not set';
+
+                document.getElementById('cityDisplay').textContent = 
+                    playerData?.city || 'Not set';
+
+                document.getElementById('stateDisplay').textContent = 
+                    playerData?.state || 'Not set';
+
+                document.getElementById('ppgDisplay').textContent = 
+                    statsData?.ppg || '--';
+
+                document.getElementById('apgDisplay').textContent = 
+                    statsData?.apg || '--';
+
+                document.getElementById('subStatus').textContent = 
+                    user.subscription === 'premium' ? 'Premium' : 'Basic';
+
+                document.getElementById('maxVideos').textContent = 
+                    user.subscription === 'premium' ? '5' : '3';
+
+                document.getElementById('statusDisplay').textContent = 
+                    user.subscription ? 'Active' : 'Inactive';
+
+                document.getElementById('activeSince').textContent = 
+                    user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today';
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDashboardData);
     </script>
 </body>
 

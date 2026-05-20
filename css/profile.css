@@ -1,4 +1,4 @@
-/* Profile Section */
+/* ========== PROFILE SECTION ========== */
 .profile-section {
     padding: 3rem 2rem;
     min-height: 100vh;
@@ -35,7 +35,6 @@
     box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);
 }
 
-/* Profile Wrapper - Two Column Layout */
 .profile-wrapper {
     display: grid;
     grid-template-columns: 1fr 380px;
@@ -57,7 +56,6 @@
     top: 100px;
 }
 
-/* Profile Card - Better Contrast */
 .profile-card {
     background: linear-gradient(135deg, #2a2d33 0%, #242729 100%);
     border: 1px solid #404450;
@@ -81,7 +79,12 @@
     color: #f0f0f0;
 }
 
-/* Profile Picture Card */
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
 .pfp-card {
     text-align: center;
 }
@@ -107,62 +110,6 @@
     margin-top: 1rem;
 }
 
-.profile-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.form-group label {
-    font-weight: 600;
-    margin-bottom: 0.6rem;
-    color: #e0e0e0;
-    font-size: 0.95rem;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-    padding: 0.75rem;
-    background-color: #1e2025;
-    border: 1px solid #3a3f47;
-    border-radius: 6px;
-    color: #f0f0f0;
-    font-size: 0.95rem;
-    font-family: inherit;
-    transition: all 0.2s ease;
-}
-
-.form-group input::placeholder,
-.form-group textarea::placeholder {
-    color: #808590;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    outline: none;
-    border-color: var(--primary-orange);
-    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
-    background-color: #252a30;
-}
-
-.form-group textarea {
-    resize: vertical;
-    min-height: 120px;
-}
-
 .contact-divider {
     font-weight: 600;
     color: #e0e0e0;
@@ -173,7 +120,6 @@
     font-size: 0.95rem;
 }
 
-/* Highlights */
 .highlight-limit {
     color: #a0a8b8;
     margin-bottom: 1.5rem;
@@ -210,7 +156,6 @@
     white-space: nowrap;
 }
 
-/* SIDEBAR - STATS DASHBOARD */
 .stats-card {
     background: linear-gradient(135deg, #2a2d33 0%, #242729 100%);
     border: 1px solid #404450;
@@ -228,7 +173,6 @@
     color: #f0f0f0;
 }
 
-/* Profile Stats Card */
 .stat-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -277,13 +221,6 @@
     box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.1) !important;
 }
 
-.btn-small {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
-    width: 100%;
-}
-
-/* Quick Profile Info */
 .quick-info {
     display: flex;
     flex-direction: column;
@@ -312,7 +249,6 @@
     color: #f0f0f0;
 }
 
-/* Subscription Card */
 .subscription-card {
     border: 2px solid #404450;
 }
@@ -344,7 +280,6 @@
     color: #4caf50;
 }
 
-/* Boost Card */
 .boost-card {
     background: linear-gradient(135deg, #2a2d33 0%, #242729 100%);
 }
@@ -374,50 +309,7 @@
     font-weight: bold;
 }
 
-/* Buttons */
-.btn {
-    padding: 0.75rem 1.75rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.btn-primary {
-    background-color: var(--primary-orange);
-    color: white;
-    border: none;
-    width: 100%;
-}
-
-.btn-primary:hover {
-    background-color: #ff7a00;
-    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
-}
-
-.btn-primary:active {
-    transform: scale(0.98);
-}
-
-.btn-secondary {
-    background-color: transparent;
-    color: var(--primary-orange);
-    border: 1px solid #404450;
-    width: 100%;
-}
-
-.btn-secondary:hover {
-    background-color: rgba(255, 140, 0, 0.1);
-    border-color: var(--primary-orange);
-}
-
-/* Responsive Design */
+/* ========== RESPONSIVE DESIGN ========== */
 @media (max-width: 1024px) {
     .profile-wrapper {
         grid-template-columns: 1fr;
@@ -457,10 +349,6 @@
         position: static;
     }
 
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-
     .profile-card {
         padding: 1.5rem;
     }
@@ -492,34 +380,7 @@
         margin-bottom: 1rem;
     }
 
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-
     .stat-grid {
         grid-template-columns: 1fr;
-    }
-
-    .profile-sidebar {
-        grid-template-columns: 1fr;
-    }
-
-    .highlight-item {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .highlight-item button {
-        width: 100%;
-    }
-
-    .info-row {
-        padding: 0.6rem;
-    }
-
-    .profile-picture-display {
-        width: 100px;
-        height: 100px;
-        font-size: 2rem;
     }
 }

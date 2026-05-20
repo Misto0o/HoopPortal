@@ -1,22 +1,22 @@
 // ============================================
 // SUPABASE CONFIGURATION
 // ============================================
-// Replace with your actual Supabase credentials
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key';
+const SUPABASE_URL = 'https://hpuikheuntquldqdewbr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwdWlraGV1bnRxdWxkcWRld2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNDc2MTQsImV4cCI6MjA5NDcyMzYxNH0.GVkICFVA3QOkZaYqf-MSag2yhCt68-M2QLGpi7_E0UA';
 
-// Initialize Supabase client (use CDN version)
 let supabaseClient = null;
 
 async function initializeSupabase() {
-    // Load Supabase via CDN
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = () => {
-        const { createClient } = window.supabase;
-        supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    };
-    document.head.appendChild(script);
+    if (!window.supabase) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+        await new Promise((resolve) => {
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+    }
+    const { createClient } = window.supabase;
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
 // ============================================
@@ -25,8 +25,10 @@ async function initializeSupabase() {
 class HoopPortalApp {
     constructor() {
         this.currentUser = null;
-        this.mockPlayers = this.generateMockPlayers();
+        this.mockPlayers = []; // Mock players disabled - using real players only
+        this.realPlayers = [];
         this.playerStats = {};
+        this.userLikedPlayers = [];
         this.init();
     }
 
@@ -34,11 +36,11 @@ class HoopPortalApp {
         await initializeSupabase();
         this.setupEventListeners();
         this.checkAuthStatus();
+        await this.loadSearchPlayers();
         this.loadPageContent();
     }
 
     setupEventListeners() {
-        // Auth buttons - retry if not found yet
         const setupAuthButtons = () => {
             const loginBtn = document.getElementById('loginBtn');
             const signupBtn = document.getElementById('signupBtn');
@@ -47,13 +49,11 @@ class HoopPortalApp {
                 loginBtn.addEventListener('click', () => this.showLoginModal());
                 signupBtn.addEventListener('click', () => this.showSignupModal());
             } else {
-                // Retry after a short delay if buttons not found
                 setTimeout(setupAuthButtons, 100);
             }
         };
         setupAuthButtons();
 
-        // Modal close
         const setupModalClose = () => {
             const closeButtons = document.querySelectorAll('.modal-close');
             if (closeButtons.length > 0) {
@@ -67,7 +67,6 @@ class HoopPortalApp {
         };
         setupModalClose();
 
-        // Modal outside click
         const setupModalClick = () => {
             const modals = document.querySelectorAll('.modal');
             if (modals.length > 0) {
@@ -80,16 +79,13 @@ class HoopPortalApp {
         };
         setupModalClick();
 
-        // Home page filters
         document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.addEventListener('click', () => this.filterProspectsHome(tab.dataset.filter));
+            tab.addEventListener('click', (event) => this.filterProspectsHome(tab.dataset.filter, event));
         });
 
-        // Search page
         document.getElementById('searchBtn')?.addEventListener('click', () => this.performSearch());
         document.getElementById('resetBtn')?.addEventListener('click', () => this.resetFilters());
 
-        // Profile forms
         document.getElementById('basicInfoForm')?.addEventListener('submit', (e) => this.handleBasicInfo(e));
         document.getElementById('gameDescriptionForm')?.addEventListener('submit', (e) => this.handleGameDescription(e));
         document.getElementById('contactForm')?.addEventListener('submit', (e) => this.handleContactInfo(e));
@@ -97,23 +93,36 @@ class HoopPortalApp {
         document.getElementById('updateStatsBtn')?.addEventListener('click', () => this.updateProfileStats());
         document.getElementById('uploadPFPBtn')?.addEventListener('click', () => this.uploadProfilePicture());
 
-        // Plan selection
         document.querySelectorAll('.select-plan-btn').forEach(btn => {
             btn.addEventListener('click', () => this.selectPlan(btn.dataset.plan));
         });
 
-        // Load saved stats
         this.loadProfileStats();
     }
 
     // ============================================
     // AUTHENTICATION
     // ============================================
-    checkAuthStatus() {
-        const user = localStorage.getItem('hoopportal_user');
-        if (user) {
-            this.currentUser = JSON.parse(user);
+    async checkAuthStatus() {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+
+        if (session && session.user) {
+            this.currentUser = {
+                id: session.user.id,
+                email: session.user.email,
+                userType: 'player',
+                createdAt: new Date(),
+                avatar: session.user.user_metadata?.avatar_url || null
+            };
+            localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+            await this.loadUserData();
+            await this.loadPlayerProfile();
             this.updateNavigation();
+
+            if (window.location.hash === '#' || window.location.pathname === '/') {
+                setTimeout(() => window.location.href = 'profile.html', 500);
+            }
+            return;
         }
     }
 
@@ -122,68 +131,67 @@ class HoopPortalApp {
         const modalBody = document.getElementById('modalBody');
 
         modalBody.innerHTML = `
-            <h2 class="auth-title">Create Account</h2>
-            <p class="auth-subtitle">Join HoopPortal and get discovered</p>
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-subtitle">Join HoopPortal and get discovered</p>
+        
+        <div class="signup-tabs">
+            <button class="signup-tab active" data-type="player">Player</button>
+            <button class="signup-tab" data-type="coach">Coach</button>
+        </div>
+
+        <form id="signupFormModal" class="auth-form">
+            <div class="form-group">
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" required placeholder="your@email.com">
+            </div>
             
-            <div class="signup-tabs">
-                <button class="signup-tab active" data-type="player">Player</button>
-                <button class="signup-tab" data-type="coach">Coach</button>
+            <div class="form-group">
+                <label for="signupPassword">Password</label>
+                <input type="password" id="signupPassword" required placeholder="Create a password">
+            </div>
+            
+            <div class="form-group">
+                <label for="signupConfirm">Confirm Password</label>
+                <input type="password" id="signupConfirm" required placeholder="Confirm password">
             </div>
 
-            <form id="signupFormModal" class="auth-form">
-                <div class="form-group">
-                    <label for="signupEmail">Email</label>
-                    <input type="email" id="signupEmail" required placeholder="your@email.com">
-                </div>
-                
-                <div class="form-group">
-                    <label for="signupPassword">Password</label>
-                    <input type="password" id="signupPassword" required placeholder="Create a password">
-                </div>
-                
-                <div class="form-group">
-                    <label for="signupConfirm">Confirm Password</label>
-                    <input type="password" id="signupConfirm" required placeholder="Confirm password">
-                </div>
+            <div class="form-group player-field" style="display: block;">
+                <label for="signupName">Full Name *</label>
+                <input type="text" id="signupName" placeholder="Your full name">
+            </div>
 
-                <div class="form-group player-field" style="display: block;">
-                    <label for="signupName">Full Name *</label>
-                    <input type="text" id="signupName" placeholder="Your full name">
-                </div>
+            <div class="form-group coach-field" style="display: none;">
+                <label for="coachTeam">Team/Program Name *</label>
+                <input type="text" id="coachTeam" placeholder="Your team or program name">
+            </div>
 
-                <div class="form-group coach-field" style="display: none;">
-                    <label for="coachTeam">Team/Program Name *</label>
-                    <input type="text" id="coachTeam" placeholder="Your team or program name">
-                </div>
+            <div class="form-group coach-field" style="display: none;">
+                <label for="coachSchool">School/Organization *</label>
+                <input type="text" id="coachSchool" placeholder="School or organization name">
+            </div>
 
-                <div class="form-group coach-field" style="display: none;">
-                    <label for="coachSchool">School/Organization *</label>
-                    <input type="text" id="coachSchool" placeholder="School or organization name">
-                </div>
+            <div class="form-group coach-field" style="display: none;">
+                <label for="coachPhone">Phone Number *</label>
+                <input type="tel" id="coachPhone" placeholder="Your phone number">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+        </form>
 
-                <div class="form-group coach-field" style="display: none;">
-                    <label for="coachPhone">Phone Number *</label>
-                    <input type="tel" id="coachPhone" placeholder="Your phone number">
-                </div>
-                
-                <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
-            </form>
+        <div class="auth-divider">or</div>
 
-            <div class="auth-divider">or</div>
+        <button class="btn btn-social" id="googleSignupBtn">
+            <span>Continue with Google</span>
+        </button>
 
-            <button class="btn btn-social">
-                <span>Continue with Google</span>
-            </button>
-
-            <p class="auth-footer">
-                Already have an account? 
-                <button type="button" class="auth-link" id="switchToLogin">Log In</button>
-            </p>
-        `;
+        <p class="auth-footer">
+            Already have an account? 
+            <button type="button" class="auth-link" id="switchToLogin">Log In</button>
+        </p>
+    `;
 
         modal.classList.add('show');
 
-        // Setup tab switching
         document.querySelectorAll('.signup-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 document.querySelectorAll('.signup-tab').forEach(t => t.classList.remove('active'));
@@ -199,8 +207,41 @@ class HoopPortalApp {
             });
         });
 
+        const googleSignupBtn = document.getElementById('googleSignupBtn');
+        if (googleSignupBtn) {
+            googleSignupBtn.addEventListener('click', () => this.handleGoogleSignup());
+        }
+
         document.getElementById('signupFormModal').addEventListener('submit', (e) => this.handleSignup(e));
         document.getElementById('switchToLogin').addEventListener('click', () => this.showLoginModal());
+    }
+
+    async handleGoogleSignup() {
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) throw error;
+        } catch (error) {
+            this.showNotification(error.message || 'Google signup failed', 'error');
+        }
+    }
+
+    async handleGoogleSignin() {
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) throw error;
+        } catch (error) {
+            this.showNotification(error.message || 'Google signin failed', 'error');
+        }
     }
 
     showLoginModal() {
@@ -208,41 +249,46 @@ class HoopPortalApp {
         const modalBody = document.getElementById('modalBody');
 
         modalBody.innerHTML = `
-            <h2 class="auth-title">Welcome Back</h2>
-            <p class="auth-subtitle">Sign in to your HoopPortal account</p>
+        <h2 class="auth-title">Welcome Back</h2>
+        <p class="auth-subtitle">Sign in to your HoopPortal account</p>
+        
+        <form id="signinFormModal" class="auth-form">
+            <div class="form-group">
+                <label for="signinEmail">Email</label>
+                <input type="email" id="signinEmail" required placeholder="your@email.com">
+            </div>
             
-            <form id="signinFormModal" class="auth-form">
-                <div class="form-group">
-                    <label for="signinEmail">Email</label>
-                    <input type="email" id="signinEmail" required placeholder="your@email.com">
-                </div>
-                
-                <div class="form-group">
-                    <label for="signinPassword">Password</label>
-                    <input type="password" id="signinPassword" required placeholder="Enter password">
-                </div>
+            <div class="form-group">
+                <label for="signinPassword">Password</label>
+                <input type="password" id="signinPassword" required placeholder="Enter password">
+            </div>
 
-                <div class="form-checkbox">
-                    <input type="checkbox" id="rememberMe" name="remember">
-                    <label for="rememberMe">Remember me</label>
-                </div>
-                
-                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
-            </form>
+            <div class="form-checkbox">
+                <input type="checkbox" id="rememberMe" name="remember">
+                <label for="rememberMe">Remember me</label>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
 
-            <div class="auth-divider">or</div>
+        <div class="auth-divider">or</div>
 
-            <button class="btn btn-social">
-                <span>Continue with Google</span>
-            </button>
+        <button class="btn btn-social" id="googleSigninBtn">
+            <span>Continue with Google</span>
+        </button>
 
-            <p class="auth-footer">
-                Don't have an account? 
-                <button type="button" class="auth-link" id="switchToSignup">Sign Up</button>
-            </p>
-        `;
+        <p class="auth-footer">
+            Don't have an account? 
+            <button type="button" class="auth-link" id="switchToSignup">Sign Up</button>
+        </p>
+    `;
 
         modal.classList.add('show');
+
+        const googleSigninBtn = document.getElementById('googleSigninBtn');
+        if (googleSigninBtn) {
+            googleSigninBtn.addEventListener('click', () => this.handleGoogleSignin());
+        }
 
         document.getElementById('signinFormModal').addEventListener('submit', (e) => this.handleSignin(e));
         document.getElementById('switchToSignup').addEventListener('click', () => this.showSignupModal());
@@ -255,7 +301,6 @@ class HoopPortalApp {
         const password = document.getElementById('signupPassword').value;
         const confirm = document.getElementById('signupConfirm').value;
 
-        // Determine user type from which tab is active
         const activeTab = document.querySelector('.signup-tab.active');
         const userType = activeTab ? activeTab.dataset.type : 'player';
 
@@ -269,51 +314,82 @@ class HoopPortalApp {
             return;
         }
 
-        // Validate required fields based on user type
-        if (userType === 'player') {
-            const name = document.getElementById('signupName').value;
-            if (!name) {
-                this.showNotification('Please enter your full name', 'error');
-                return;
+        try {
+            const { data, error } = await supabaseClient.auth.signUp({
+                email,
+                password
+            });
+
+            if (error) throw error;
+
+            if (!data.user) {
+                throw new Error('Signup failed. Please try again.');
             }
-        } else if (userType === 'coach') {
-            const team = document.getElementById('coachTeam').value;
-            const school = document.getElementById('coachSchool').value;
-            const phone = document.getElementById('coachPhone').value;
-            if (!team || !school || !phone) {
-                this.showNotification('Please fill in all coach information', 'error');
-                return;
+
+            this.currentUser = {
+                id: data.user.id,
+                email: data.user.email,
+                userType,
+                createdAt: new Date(),
+                avatar: null
+            };
+
+            localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+
+            // Create profiles in Supabase
+            await this.createUserProfile(userType);
+            this.initializeUserData();
+            await this.loadUserData();
+
+            this.showNotification('Account created! Check your email to confirm.', 'success');
+            this.closeModal(document.getElementById('authModal'));
+            this.updateNavigation();
+
+            if (userType === 'player') {
+                setTimeout(() => window.location.href = 'profile.html', 1500);
             }
+        } catch (error) {
+            this.showNotification(error.message || 'Signup failed', 'error');
+            console.error('Signup error:', error);
         }
+    }
 
-        // For now, using localStorage. Replace with Supabase auth when ready
-        const user = {
-            id: Date.now().toString(),
-            email,
-            userType,
-            createdAt: new Date(),
-            subscription: null
-        };
+    async createUserProfile(userType) {
+        if (!this.currentUser) return;
 
-        if (userType === 'player') {
-            user.name = document.getElementById('signupName').value;
-        } else if (userType === 'coach') {
-            user.team = document.getElementById('coachTeam').value;
-            user.school = document.getElementById('coachSchool').value;
-            user.phone = document.getElementById('coachPhone').value;
-        }
+        try {
+            const { error: userError } = await supabaseClient
+                .from('user_profiles')
+                .upsert({
+                    id: this.currentUser.id,
+                    email: this.currentUser.email,
+                    user_type: userType,
+                    avatar_url: this.currentUser.avatar
+                }, { onConflict: 'id' });
 
-        this.currentUser = user;
-        localStorage.setItem('hoopportal_user', JSON.stringify(user));
+            if (userError) throw userError;
 
-        this.showNotification('Account created! Welcome to HoopPortal', 'success');
-        this.closeModal(document.getElementById('authModal'));
-        this.updateNavigation();
+            if (userType === 'player') {
+                const { error: playerError } = await supabaseClient
+                    .from('player_profiles')
+                    .insert({
+                        id: this.currentUser.id
+                    });
 
-        if (userType === 'player') {
-            setTimeout(() => window.location.href = 'profile.html', 1500);
-        } else if (userType === 'coach') {
-            setTimeout(() => window.location.href = 'dashboard.html', 1500);
+                if (playerError && playerError.code !== '23505') throw playerError;
+            }
+
+            if (userType === 'coach') {
+                const { error: coachError } = await supabaseClient
+                    .from('coach_profiles')
+                    .insert({
+                        id: this.currentUser.id
+                    });
+
+                if (coachError && coachError.code !== '23505') throw coachError;
+            }
+        } catch (error) {
+            console.error('Create profile error:', error);
         }
     }
 
@@ -323,20 +399,31 @@ class HoopPortalApp {
         const email = document.getElementById('signinEmail').value;
         const password = document.getElementById('signinPassword').value;
 
-        // For now, basic auth. Replace with Supabase when ready
-        const user = {
-            id: email,
-            email,
-            userType: 'player',
-            createdAt: new Date()
-        };
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email,
+                password
+            });
 
-        this.currentUser = user;
-        localStorage.setItem('hoopportal_user', JSON.stringify(user));
+            if (error) throw error;
 
-        this.showNotification('Signed in successfully!', 'success');
-        this.closeModal(document.getElementById('authModal'));
-        this.updateNavigation();
+            this.currentUser = {
+                id: data.user.id,
+                email: data.user.email,
+                userType: 'player',
+                createdAt: new Date(),
+                avatar: null
+            };
+
+            localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+            await this.loadUserData();
+
+            this.showNotification('Signed in successfully!', 'success');
+            this.closeModal(document.getElementById('authModal'));
+            this.updateNavigation();
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        }
     }
 
     updateNavigation() {
@@ -344,79 +431,291 @@ class HoopPortalApp {
         const signupBtn = document.getElementById('signupBtn');
         const navMenu = document.getElementById('navMenu');
 
-        if (loginBtn && signupBtn) {
-            if (this.currentUser) {
-                loginBtn.style.display = 'none';
-                signupBtn.style.display = 'none';
+        if (!navMenu) return;
 
-                if (!document.getElementById('logoutBtn')) {
-                    const logoutBtn = document.createElement('button');
-                    logoutBtn.id = 'logoutBtn';
-                    logoutBtn.className = 'nav-btn nav-btn-signup';
-                    logoutBtn.textContent = `Log Out`;
-                    logoutBtn.addEventListener('click', () => this.handleLogout());
-                    navMenu.appendChild(logoutBtn);
+        if (this.currentUser) {
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (signupBtn) signupBtn.style.display = 'none';
 
-                    const dashboardBtn = document.createElement('a');
-                    dashboardBtn.href = 'dashboard.html';
-                    dashboardBtn.className = 'nav-link';
-                    dashboardBtn.textContent = 'Dashboard';
-                    navMenu.insertBefore(dashboardBtn, logoutBtn);
-                }
+            const oldBanner = document.getElementById('navProfileBanner');
+            const oldLogout = document.getElementById('logoutBtn');
+            if (oldBanner) oldBanner.remove();
+            if (oldLogout) oldLogout.remove();
+
+            const profileBanner = document.createElement('button');
+            profileBanner.id = 'navProfileBanner';
+            profileBanner.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                background: linear-gradient(135deg, #2a2d33 0%, #1e2025 100%);
+                border: 1px solid #404450;
+                padding: 6px 14px;
+                border-radius: 30px;
+                cursor: pointer;
+                color: #f0f0f0;
+                font-weight: 600;
+                transition: all 0.2s ease;
+            `;
+            profileBanner.addEventListener('mouseover', () => profileBanner.style.borderColor = 'var(--primary-orange)');
+            profileBanner.addEventListener('mouseout', () => profileBanner.style.borderColor = '#404450');
+            profileBanner.addEventListener('click', () => window.location.href = 'dashboard.html');
+
+            if (this.currentUser.avatar) {
+                profileBanner.innerHTML = `
+                    <img src="${this.currentUser.avatar}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary-orange);" alt="Profile">
+                    <span style="font-size: 0.9rem;">Dashboard</span>
+                `;
             } else {
-                loginBtn.style.display = 'inline-block';
-                signupBtn.style.display = 'inline-block';
-
-                const logoutBtn = document.getElementById('logoutBtn');
-                const dashboardBtn = document.querySelector('a[href="dashboard.html"]');
-                if (logoutBtn) logoutBtn.remove();
-                if (dashboardBtn) dashboardBtn.remove();
+                profileBanner.innerHTML = `
+                    <span style="font-size: 1.2rem; line-height: 1;">🏀</span>
+                    <span style="font-size: 0.9rem;">Dashboard</span>
+                `;
             }
+
+            const logoutBtn = document.createElement('button');
+            logoutBtn.id = 'logoutBtn';
+            logoutBtn.className = 'nav-btn nav-btn-signup';
+            logoutBtn.textContent = `Log Out`;
+            logoutBtn.addEventListener('click', () => this.handleLogout());
+
+            navMenu.appendChild(profileBanner);
+            navMenu.appendChild(logoutBtn);
+        } else {
+            if (loginBtn) loginBtn.style.display = 'inline-block';
+            if (signupBtn) signupBtn.style.display = 'inline-block';
+
+            const oldBanner = document.getElementById('navProfileBanner');
+            const oldLogout = document.getElementById('logoutBtn');
+            if (oldBanner) oldBanner.remove();
+            if (oldLogout) oldLogout.remove();
         }
     }
 
-    handleLogout() {
+    updateNavBarAvatar(newAvatarUrl) {
+        const navProfileBanner = document.getElementById('navProfileBanner');
+        if (navProfileBanner) {
+            navProfileBanner.innerHTML = `
+                <img src="${newAvatarUrl}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary-orange);" alt="Profile">
+                <span style="font-size: 0.9rem;">Dashboard</span>
+            `;
+        }
+    }
+
+    async handleLogout() {
+        try {
+            await supabaseClient.auth.signOut();
+        } catch (e) {
+            console.error("Logout error:", e);
+        }
+
         this.currentUser = null;
         localStorage.removeItem('hoopportal_user');
+        this.userLikedPlayers = [];
+
         this.showNotification('Logged out successfully', 'success');
         this.updateNavigation();
         window.location.href = 'index.html';
     }
 
     // ============================================
-    // PROFILE STATS & PICTURE
+    // USER DATA MANAGEMENT
     // ============================================
-    loadProfileStats() {
-        const stats = localStorage.getItem('hoopportal_player_stats');
-        if (stats) {
-            this.playerStats = JSON.parse(stats);
-            this.displayProfileStats();
+    initializeUserData() {
+        if (!this.currentUser) return;
+
+        const userKey = `hoopportal_user_${this.currentUser.id}`;
+        const userData = {
+            likedPlayers: [],
+            stats: {}
+        };
+        localStorage.setItem(userKey, JSON.stringify(userData));
+    }
+
+    async loadUserData() {
+        if (!document.getElementById('firstName')) {
+            return;
+        }
+        if (!this.currentUser) return;
+
+        try {
+            // LOAD PLAYER PROFILE
+            const { data: profileData, error: profileError } = await supabaseClient
+                .from('player_profiles')
+                .select('*')
+                .eq('id', this.currentUser.id)
+                .maybeSingle();
+
+            if (profileError) throw profileError;
+
+            console.log('PROFILE DATA:', profileData);
+
+            if (profileData) {
+                document.getElementById('position').value = profileData.position || '';
+                document.getElementById('height').value = profileData.height || '';
+                document.getElementById('weight').value = profileData.weight || '';
+                document.getElementById('classYear').value = profileData.class_year || '';
+                document.getElementById('school').value = profileData.school || '';
+                document.getElementById('transferSchool').value = profileData.transfer_school || '';
+                document.getElementById('city').value = profileData.city || '';
+                document.getElementById('state').value = profileData.state || '';
+
+                // Store on app instance for dashboard access
+                this.position = profileData.position || '';
+                this.height = profileData.height || '';
+                this.weight = profileData.weight || '';
+                this.classYear = profileData.class_year || '';
+                this.school = profileData.school || '';
+                this.transferSchool = profileData.transfer_school || '';
+                this.city = profileData.city || '';
+                this.state = profileData.state || '';
+
+                const gameDesc = document.getElementById('gameDescription');
+                if (gameDesc) {
+                    gameDesc.value = profileData.game_description || '';
+                }
+
+                const coachType = document.getElementById('coachType');
+                if (coachType) {
+                    coachType.value = profileData.coach_preferences || '';
+                }
+            }
+
+            // LOAD PLAYER STATS
+            const { data: statsData, error: statsError } = await supabaseClient
+                .from('player_stats')
+                .select('*')
+                .eq('player_id', this.currentUser.id)
+                .maybeSingle();
+
+            if (statsError) throw statsError;
+
+            console.log('STATS DATA:', statsData);
+
+            if (statsData) {
+                this.playerStats = {
+                    ppg: statsData.ppg,
+                    apg: statsData.apg,
+                    rpg: statsData.rpg,
+                    fg: statsData.fg_percent,
+                    '3p': statsData.three_p_percent,
+                    spg: statsData.spg,
+                    bpg: statsData.bpg,
+                    ft: statsData.ft_percent,
+                    tov: statsData.tov
+                };
+
+                this.displayProfileStats();
+            }
+
+            this.updateQuickProfile();
+
+        } catch (err) {
+            console.error('LOAD USER DATA ERROR:', err);
         }
     }
 
-    displayProfileStats() {
-        // Display stored stats
-        document.getElementById('statPPG').textContent = this.playerStats.ppg || '—';
-        document.getElementById('statAPG').textContent = this.playerStats.apg || '—';
-        document.getElementById('statRPG').textContent = this.playerStats.rpg || '—';
-        document.getElementById('statFG').textContent = this.playerStats.fg ? this.playerStats.fg + '%' : '—';
+    async loadStatsFromSupabase() {
+        if (!this.currentUser) return;
 
-        // Populate inputs
-        document.getElementById('inputPPG').value = this.playerStats.ppg || '';
-        document.getElementById('inputAPG').value = this.playerStats.apg || '';
-        document.getElementById('inputRPG').value = this.playerStats.rpg || '';
-        document.getElementById('inputFG').value = this.playerStats.fg || '';
+        try {
+            const { data, error } = await supabaseClient
+                .from('player_stats')
+                .select('*')
+                .eq('player_id', this.currentUser.id)
+                .maybeSingle();
 
-        // Display profile picture if exists
-        const pfp = localStorage.getItem('hoopportal_player_pfp');
-        if (pfp) {
-            const pfpImg = document.getElementById('profilePicture');
-            if (pfpImg) {
-                pfpImg.style.backgroundImage = `url('${pfp}')`;
-                pfpImg.style.backgroundSize = 'cover';
-                pfpImg.style.backgroundPosition = 'center';
-                pfpImg.textContent = '';
+            if (error && error.code !== 'PGRST116') {
+                throw error;
             }
+
+            if (data) {
+                this.playerStats = {
+                    ppg: data.ppg,
+                    apg: data.apg,
+                    rpg: data.rpg,
+                    fg: data.fg_percent,
+                    '3p': data.three_p_percent,
+                    spg: data.spg,
+                    bpg: data.bpg,
+                    ft: data.ft_percent,
+                    tov: data.tov
+                };
+
+                const userKey = `hoopportal_user_${this.currentUser.id}`;
+                const userData = JSON.parse(localStorage.getItem(userKey) || '{"likedPlayers":[],"stats":{}}');
+                userData.stats = this.playerStats;
+                localStorage.setItem(userKey, JSON.stringify(userData));
+            }
+        } catch (error) {
+            console.error('Load stats error:', error);
+        }
+    }
+
+    saveUserData() {
+        if (!this.currentUser) return;
+
+        const userKey = `hoopportal_user_${this.currentUser.id}`;
+        const userData = {
+            likedPlayers: this.userLikedPlayers,
+            stats: this.playerStats
+        };
+        localStorage.setItem(userKey, JSON.stringify(userData));
+    }
+
+    // ============================================
+    // PROFILE STATS & PICTURE
+    // ============================================
+    loadProfileStats() {
+        if (this.currentUser) {
+            this.playerStats = this.playerStats || {};
+        } else {
+            const stats = localStorage.getItem('hoopportal_player_stats');
+            if (stats) {
+                this.playerStats = JSON.parse(stats);
+            }
+        }
+        this.displayProfileStats();
+    }
+
+    displayProfileStats() {
+        if (document.getElementById('statPPG')) {
+            document.getElementById('statPPG').textContent = this.playerStats.ppg || '—';
+            document.getElementById('statAPG').textContent = this.playerStats.apg || '—';
+            document.getElementById('statRPG').textContent = this.playerStats.rpg || '—';
+            document.getElementById('statFG').textContent = this.playerStats.fg ? this.playerStats.fg + '%' : '—';
+
+            document.getElementById('inputPPG').value = this.playerStats.ppg || '';
+            document.getElementById('inputAPG').value = this.playerStats.apg || '';
+            document.getElementById('inputRPG').value = this.playerStats.rpg || '';
+            document.getElementById('inputFG').value = this.playerStats.fg || '';
+        }
+
+        if (document.getElementById('stat3P')) {
+            document.getElementById('stat3P').textContent = this.playerStats['3p'] ? this.playerStats['3p'] + '%' : '—';
+            document.getElementById('input3P').value = this.playerStats['3p'] || '';
+        }
+        if (document.getElementById('statSPG')) {
+            document.getElementById('statSPG').textContent = this.playerStats.spg || '—';
+            document.getElementById('inputSPG').value = this.playerStats.spg || '';
+        }
+        if (document.getElementById('statBPG')) {
+            document.getElementById('statBPG').textContent = this.playerStats.bpg || '—';
+            document.getElementById('inputBPG').value = this.playerStats.bpg || '';
+        }
+        if (document.getElementById('statFT')) {
+            document.getElementById('statFT').textContent = this.playerStats.ft ? this.playerStats.ft + '%' : '—';
+            document.getElementById('inputFT').value = this.playerStats.ft || '';
+        }
+
+        if (document.getElementById('statTOV')) {
+            document.getElementById('statTOV').textContent = this.playerStats.tov || '—';
+            document.getElementById('inputTOV').value = this.playerStats.tov || '';
+        }
+
+        const pfpImg = document.getElementById('profilePicture');
+        if (pfpImg && this.currentUser?.avatar_url) {
+            pfpImg.innerHTML = `<img src="${this.currentUser.avatar_url}" alt="Profile Picture" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
         }
     }
 
@@ -426,110 +725,529 @@ class HoopPortalApp {
         const rpg = document.getElementById('inputRPG').value;
         const fg = document.getElementById('inputFG').value;
 
-        this.playerStats = {
+        const updatedStats = {
             ppg: ppg ? parseFloat(ppg).toFixed(1) : null,
             apg: apg ? parseFloat(apg).toFixed(1) : null,
             rpg: rpg ? parseFloat(rpg).toFixed(1) : null,
             fg: fg ? parseFloat(fg).toFixed(1) : null
         };
 
-        localStorage.setItem('hoopportal_player_stats', JSON.stringify(this.playerStats));
+        const threeP = document.getElementById('input3P')?.value;
+        const spg = document.getElementById('inputSPG')?.value;
+        const bpg = document.getElementById('inputBPG')?.value;
+        const ft = document.getElementById('inputFT')?.value;
+        const tov = document.getElementById('inputTOV')?.value;
+
+        if (threeP !== undefined && threeP !== '') updatedStats['3p'] = parseFloat(threeP).toFixed(1);
+        if (spg !== undefined && spg !== '') updatedStats.spg = parseFloat(spg).toFixed(1);
+        if (bpg !== undefined && bpg !== '') updatedStats.bpg = parseFloat(bpg).toFixed(1);
+        if (ft !== undefined && ft !== '') updatedStats.ft = parseFloat(ft).toFixed(1);
+        if (tov !== undefined && tov !== '') updatedStats.tov = parseFloat(tov).toFixed(1);
+
+        this.playerStats = updatedStats;
+
+        if (this.currentUser) {
+            const userKey = `hoopportal_user_${this.currentUser.id}`;
+            const userData = JSON.parse(localStorage.getItem(userKey) || '{"likedPlayers":[],"stats":{}}');
+            userData.stats = this.playerStats;
+            localStorage.setItem(userKey, JSON.stringify(userData));
+
+            this.saveStatsToSupabase();
+        } else {
+            localStorage.setItem('hoopportal_player_stats', JSON.stringify(this.playerStats));
+        }
+
         this.displayProfileStats();
         this.showNotification('Player stats updated!', 'success');
     }
 
-    uploadProfilePicture() {
+    async saveStatsToSupabase() {
+        if (!this.currentUser) return;
+
+        try {
+            const { error } = await supabaseClient
+                .from('player_stats')
+                .upsert({
+                    player_id: this.currentUser.id,
+                    ppg: this.playerStats.ppg,
+                    apg: this.playerStats.apg,
+                    rpg: this.playerStats.rpg,
+                    fg_percent: this.playerStats.fg,
+                    three_p_percent: this.playerStats['3p'],
+                    spg: this.playerStats.spg,
+                    bpg: this.playerStats.bpg,
+                    ft_percent: this.playerStats.ft,
+                    tov: this.playerStats.tov
+                }, { onConflict: 'player_id' });
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Save stats error:', error);
+        }
+    }
+
+    async loadPlayerProfile() {
+        if (!document.getElementById('firstName')) {
+            return;
+        }
+        if (!this.currentUser) return;
+
+        try {
+            // LOAD USER PROFILE
+            const { data: userProfile, error: userError } = await supabaseClient
+                .from('user_profiles')
+                .select('*')
+                .eq('id', this.currentUser.id)
+                .maybeSingle();
+
+            if (userError) throw userError;
+
+            if (userProfile) {
+                this.currentUser.first_name = userProfile.first_name;
+                this.currentUser.last_name = userProfile.last_name;
+                document.getElementById('firstName').value = userProfile.first_name || '';
+                document.getElementById('lastName').value = userProfile.last_name || '';
+            }
+
+            // LOAD PLAYER PROFILE
+            const { data: playerProfile, error: profileError } = await supabaseClient
+                .from('player_profiles')
+                .select('*')
+                .eq('id', this.currentUser.id)
+                .maybeSingle();
+
+            if (profileError) throw profileError;
+
+            if (playerProfile) {
+                this.school = playerProfile.school;
+                this.transferSchool = playerProfile.transfer_school;
+                this.position = playerProfile.position;
+                this.height = playerProfile.height;
+                this.weight = playerProfile.weight;
+                this.classYear = playerProfile.class_year;
+                this.city = playerProfile.city;
+                this.state = playerProfile.state;
+                if (playerProfile.profile_picture_url) {
+                    const pfpContainer = document.getElementById('profilePicture');
+                    if (pfpContainer) {
+                        pfpContainer.innerHTML = `<img src="${playerProfile.profile_picture_url}" alt="Profile Picture" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                    }
+                }
+
+                document.getElementById('position').value = playerProfile.position || '';
+                document.getElementById('height').value = playerProfile.height || '';
+                document.getElementById('weight').value = playerProfile.weight || '';
+                document.getElementById('classYear').value = playerProfile.class_year || '';
+                document.getElementById('school').value = playerProfile.school || '';
+                document.getElementById('transferSchool').value = playerProfile.transfer_school || '';
+                document.getElementById('city').value = playerProfile.city || '';
+                document.getElementById('state').value = playerProfile.state || '';
+                document.getElementById('gameDescription').value = playerProfile.game_description || '';
+                document.getElementById('coachType').value = playerProfile.coach_preferences || '';
+            }
+
+            // LOAD PLAYER CONTACT
+            const { data: contactData, error: contactError } = await supabaseClient
+                .from('player_contact')
+                .select('*')
+                .eq('player_id', this.currentUser.id)
+                .maybeSingle();
+
+            if (contactError) throw contactError;
+
+            if (contactData) {
+                document.getElementById('playerEmail').value = contactData.player_email || '';
+                document.getElementById('playerPhone').value = contactData.player_phone || '';
+            }
+
+            // LOAD PARENTS / GUARDIANS
+            const { data: guardians, error: guardianError } = await supabaseClient
+                .from('parent_guardians')
+                .select('*')
+                .eq('player_id', this.currentUser.id);
+
+            if (guardianError) throw guardianError;
+
+            if (guardians && guardians.length > 0) {
+                const parent1 = guardians.find(g => g.parent_number === 1);
+                const parent2 = guardians.find(g => g.parent_number === 2);
+
+                if (parent1) {
+                    document.getElementById('parentName').value = parent1.name || '';
+                    document.getElementById('parentEmail').value = parent1.email || '';
+                    document.getElementById('parentPhone').value = parent1.phone || '';
+                }
+
+                if (parent2) {
+                    document.getElementById('parentName2').value = parent2.name || '';
+                    document.getElementById('parentEmail2').value = parent2.email || '';
+                    document.getElementById('parentPhone2').value = parent2.phone || '';
+                }
+            }
+
+            this.updateQuickProfile();
+
+        } catch (err) {
+            console.error('Load profile error:', err);
+        }
+    }
+
+    async uploadProfilePicture() {
+        if (!this.currentUser) {
+            this.showNotification('Please log in first', 'error');
+            return;
+        }
+
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/*';
-        fileInput.onchange = (e) => {
+
+        fileInput.onchange = async (e) => {
             const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const imageData = event.target.result;
-                    localStorage.setItem('hoopportal_player_pfp', imageData);
-                    this.displayProfileStats();
-                    this.showNotification('Profile picture updated!', 'success');
-                };
-                reader.readAsDataURL(file);
+            if (!file) return;
+
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${this.currentUser.id}-${Date.now()}.${fileExt}`;
+
+                const { error: uploadError } = await supabaseClient.storage
+                    .from('profile-pictures')
+                    .upload(fileName, file, {
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabaseClient.storage
+                    .from('profile-pictures')
+                    .getPublicUrl(fileName);
+
+                const { error: dbError } = await supabaseClient
+                    .from('player_profiles')
+                    .update({
+                        profile_picture_url: publicUrl
+                    })
+                    .eq('id', this.currentUser.id);
+
+                if (dbError) throw dbError;
+
+                const pfpContainer = document.getElementById('profilePicture');
+                if (pfpContainer) {
+                    pfpContainer.innerHTML = `<img src="${publicUrl}" alt="Profile Picture" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                }
+
+                // Update current user avatar
+                this.currentUser.avatar = publicUrl;
+                localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+
+                // UPDATE NAVBAR AVATAR
+                this.updateNavBarAvatar(publicUrl);
+
+                this.showNotification('Profile picture updated!', 'success');
+
+            } catch (err) {
+                console.error(err);
+                this.showNotification(err.message || 'Upload failed', 'error');
             }
         };
+
         fileInput.click();
     }
 
-    updateQuickProfile() {
-        const position = document.getElementById('position').value;
-        const height = document.getElementById('height').value;
-        const weight = document.getElementById('weight').value;
-        const classYear = document.getElementById('classYear').value;
-        const gpa = document.getElementById('gpa').value;
-        const city = document.getElementById('city').value;
-        const state = document.getElementById('state').value;
+    // ============================================
+    // LOAD REAL PLAYERS FROM SUPABASE
+    // ============================================
+    async loadSearchPlayers() {
+        try {
+            // Load player profiles
+            const { data: playerData, error: playerError } = await supabaseClient
+                .from('player_profiles')
+                .select('*');
 
-        document.getElementById('displayPosition').textContent = position || '—';
-        document.getElementById('displayHeight').textContent = height || '—';
-        document.getElementById('displayWeight').textContent = weight ? weight + ' lbs' : '—';
-        document.getElementById('displayClassYear').textContent = classYear || '—';
-        document.getElementById('displayGPA').textContent = gpa || '—';
-        document.getElementById('displayLocation').textContent = (city && state) ? `${city}, ${state}` : '—';
+            if (playerError) throw playerError;
+
+            // Load user profiles to get names and avatars
+            const { data: userData, error: userError } = await supabaseClient
+                .from('user_profiles')
+                .select('id, first_name, last_name, avatar_url, gender');
+
+            if (userError) throw userError;
+
+            // Create a map for quick lookup
+            const userMap = {};
+            userData.forEach(user => {
+                userMap[user.id] = {
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    avatar: user.avatar_url,
+                    gender: user.gender
+                };
+            });
+
+            // Combine data
+            this.realPlayers = playerData.map(player => {
+                const userInfo = userMap[player.id] || {};
+                const fullName = `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim();
+
+                return {
+                    id: player.id,
+                    name: fullName || 'Unnamed Player',
+                    avatar: player.profile_picture_url || userInfo.avatar || null,
+                    emoji: '🏀',
+                    gender: userInfo.gender || 'boys',
+                    position: player.position,
+                    height: player.height,
+                    weight: player.weight,
+                    school: player.school,
+                    city: player.city,
+                    state: player.state,
+                    classYear: player.class_year,
+                    premium: player.is_premium,
+                    likes: 0,
+                    liked: false,
+                    description: player.game_description || '',
+                    coachType: player.coach_preferences || '',
+                    realProfile: true
+                };
+            });
+
+            console.log('REAL PLAYERS:', this.realPlayers);
+
+        } catch (err) {
+            console.error('Load search players error:', err);
+        }
+    }
+
+    updateQuickProfile() {
+        const position = document.getElementById('position')?.value;
+        const height = document.getElementById('height')?.value;
+        const weight = document.getElementById('weight')?.value;
+        const classYear = document.getElementById('classYear')?.value;
+        const city = document.getElementById('city')?.value;
+        const state = document.getElementById('state')?.value;
+        const school = document.getElementById('school')?.value;
+        const transferSchool = document.getElementById('transferSchool')?.value;
+        const firstName = document.getElementById('firstName')?.value;
+        const lastName = document.getElementById('lastName')?.value;
+
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        setText('positionDisplay', position || 'Not set');
+        setText('heightDisplay', height || 'Not set');
+        setText('weightDisplay', weight ? `${weight} lbs` : 'Not set');
+        setText('classDisplay', classYear || 'Not set');
+
+        setText('cityDisplay', city || 'Not set');
+        setText('stateDisplay', state || 'Not set');
+
+        setText('schoolDisplay', school || 'Not set');
+        setText('transferSchoolDisplay', transferSchool || '--');
+
+        const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+        setText('nameDisplay', fullName || 'Not set');
+
+        if (this.playerStats) {
+            setText('ppgDisplay', this.playerStats.ppg || '--');
+            setText('apgDisplay', this.playerStats.apg || '--');
+        }
+    }
+
+    async loadGoogleProfilePicture() {
+        try {
+            const { data: { user }, error } = await supabaseClient.auth.getUser();
+
+            if (error) throw error;
+
+            if (user && user.user_metadata) {
+                const googlePfpUrl = user.user_metadata.avatar_url || user.user_metadata.picture;
+
+                this.currentUser.avatar = googlePfpUrl;
+                this.currentUser.avatar_url = googlePfpUrl;
+
+                localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+
+                await supabaseClient
+                    .from('user_profiles')
+                    .upsert({
+                        id: this.currentUser.id,
+                        avatar_url: googlePfpUrl
+                    });
+
+                const pfpContainer = document.getElementById('profilePicture');
+                const placeholder = document.getElementById('pfpPlaceholder');
+
+                if (googlePfpUrl && pfpContainer) {
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    pfpContainer.innerHTML = `<img src="${googlePfpUrl}" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                }
+
+                // UPDATE NAVBAR AVATAR
+                this.updateNavBarAvatar(googlePfpUrl);
+            }
+        } catch (err) {
+            console.error("Error fetching user metadata:", err.message);
+        }
+    }
+
+    // ============================================
+    // PROFILE FORMS
+    // ============================================
+    async handleBasicInfo(e) {
+        e.preventDefault();
+
+        if (!this.currentUser) {
+            this.showNotification('Please log in first', 'error');
+            return;
+        }
+
+        const gender = document.getElementById('gender')?.value;
+
+        try {
+            // SAVE user_profiles
+            const { error: userError } = await supabaseClient
+                .from('user_profiles')
+                .upsert({
+                    id: this.currentUser.id,
+                    first_name: document.getElementById('firstName').value,
+                    last_name: document.getElementById('lastName').value,
+                    gender: gender,
+                    updated_at: new Date()
+                }, { onConflict: 'id' });
+
+            if (userError) throw userError;
+
+            // SAVE player_profiles
+            const { error: profileError } = await supabaseClient
+                .from('player_profiles')
+                .upsert({
+                    id: this.currentUser.id,
+                    position: document.getElementById('position').value,
+                    height: document.getElementById('height').value,
+                    weight: parseInt(document.getElementById('weight').value) || null,
+                    class_year: parseInt(document.getElementById('classYear').value) || null,
+                    school: document.getElementById('school').value,
+                    transfer_school: document.getElementById('transferSchool').value,
+                    city: document.getElementById('city').value,
+                    state: document.getElementById('state').value,
+                    updated_at: new Date()
+                }, { onConflict: 'id' });
+
+            if (profileError) throw profileError;
+
+            // Update app instance properties for dashboard
+            this.position = document.getElementById('position').value;
+            this.height = document.getElementById('height').value;
+            this.weight = document.getElementById('weight').value;
+            this.classYear = document.getElementById('classYear').value;
+            this.school = document.getElementById('school').value;
+            this.transferSchool = document.getElementById('transferSchool').value;
+            this.city = document.getElementById('city').value;
+            this.state = document.getElementById('state').value;
+
+            this.updateQuickProfile();
+            this.showNotification('Basic information saved!', 'success');
+
+        } catch (error) {
+            console.error(error);
+            this.showNotification(error.message || 'Failed to save', 'error');
+        }
+    }
+
+    async handleGameDescription(e) {
+        e.preventDefault();
+        if (!this.currentUser) {
+            this.showNotification('Please log in first', 'error');
+            return;
+        }
+
+        try {
+            const { error } = await supabaseClient
+                .from('player_profiles')
+                .update({
+                    game_description: document.getElementById('gameDescription').value,
+                    coach_preferences: document.getElementById('coachType').value
+                })
+                .eq('id', this.currentUser.id);
+
+            if (error) throw error;
+
+            this.showNotification('Game description saved!', 'success');
+        } catch (error) {
+            this.showNotification(error.message || 'Failed to save', 'error');
+        }
+    }
+
+    async handleContactInfo(e) {
+        e.preventDefault();
+        if (!this.currentUser) {
+            this.showNotification('Please log in first', 'error');
+            return;
+        }
+
+        try {
+            // Save player contact
+            const { error: contactError } = await supabaseClient
+                .from('player_contact')
+                .upsert({
+                    player_id: this.currentUser.id,
+                    player_email: document.getElementById('playerEmail').value,
+                    player_phone: document.getElementById('playerPhone').value
+                }, { onConflict: 'player_id' });
+
+            if (contactError) throw contactError;
+
+            // Save parent 1
+            const { error: parent1Error } = await supabaseClient
+                .from('parent_guardians')
+                .upsert({
+                    player_id: this.currentUser.id,
+                    parent_number: 1,
+                    name: document.getElementById('parentName').value,
+                    email: document.getElementById('parentEmail').value || null,
+                    phone: document.getElementById('parentPhone').value || null
+                }, { onConflict: 'player_id,parent_number' });
+
+            if (parent1Error) throw parent1Error;
+
+            // Save parent 2 (optional)
+            const parent2Name = document.getElementById('parentName2').value;
+            if (parent2Name) {
+                const { error: parent2Error } = await supabaseClient
+                    .from('parent_guardians')
+                    .upsert({
+                        player_id: this.currentUser.id,
+                        parent_number: 2,
+                        name: parent2Name,
+                        email: document.getElementById('parentEmail2').value || null,
+                        phone: document.getElementById('parentPhone2').value || null
+                    }, { onConflict: 'player_id,parent_number' });
+
+                if (parent2Error) throw parent2Error;
+            }
+
+            this.showNotification('Contact information saved!', 'success');
+        } catch (error) {
+            this.showNotification(error.message || 'Failed to save', 'error');
+        }
     }
 
     // ============================================
     // PROSPECTS
     // ============================================
-    generateMockPlayers() {
-        // Only 2 example players + limited data
-        return [
-            {
-                id: 1,
-                name: 'Jordan Williams',
-                gender: 'boys',
-                position: 'PG',
-                height: "6'2",
-                weight: 190,
-                transcript: 'https://example.com/transcript1.pdf',
-                school: 'Lincoln High',
-                city: 'Charlotte',
-                state: 'NC',
-                classYear: 2027,
-                premium: true,
-                emoji: '🏀',
-                likes: 145,
-                liked: false,
-                description: 'Quick point guard with excellent court vision and ball handling.',
-                coachType: 'High-paced offense, development-focused program'
-            },
-            {
-                id: 2,
-                name: 'Maya Johnson',
-                gender: 'girls',
-                position: 'CG',
-                height: "5'8\"",
-                weight: 140,
-                transcript: 'https://example.com/transcript2.pdf',
-                school: 'St. Mary Academy',
-                city: 'Charlotte',
-                state: 'NC',
-                classYear: 2028,
-                premium: false,
-                emoji: '⚡',
-                likes: 87,
-                liked: false,
-                description: 'Explosive scorer with range. Defensive intensity on every possession.',
-                coachType: 'Competitive program with strong academics'
-            }
-        ];
-    }
-
-    filterProspectsHome(gender) {
+    filterProspectsHome(gender, event) {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-        event.target.classList.add('active');
+        if (event && event.target) event.target.classList.add('active');
 
-        const filtered = gender === 'all'
-            ? this.mockPlayers.slice(0, 2)
-            : this.mockPlayers.filter(p => p.gender === gender);
+        // Use real players only
+        let filtered = gender === 'all'
+            ? this.realPlayers
+            : this.realPlayers.filter(p => p.gender === gender);
 
+        filtered = filtered.slice(0, 20);
         this.displayProspectsHome(filtered);
     }
 
@@ -542,32 +1260,38 @@ class HoopPortalApp {
             return;
         }
 
-        container.innerHTML = prospects.map(p => `
-            <div class="prospect-card-home ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal(${p.id})">
-                <div class="prospect-avatar">${p.emoji}</div>
-                <div class="prospect-card-content">
-                    <h3>${p.name}</h3>
-                    <div class="prospect-stats">
-                        <div class="stat-item">
-                            <div class="stat-label">Position</div>
-                            <div class="stat-value">${p.position}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Class</div>
-                            <div class="stat-value">${p.classYear}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Height</div>
-                            <div class="stat-value">${p.height}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Location</div>
-                            <div class="stat-value">${p.city}, ${p.state}</div>
+        container.innerHTML = prospects.map(p => {
+            const avatarContent = p.avatar
+                ? `<img src="${p.avatar}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
+                : p.emoji;
+
+            return `
+                <div class="prospect-card-home ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal('${p.id}')">
+                    <div class="prospect-avatar">${avatarContent}</div>
+                    <div class="prospect-card-content">
+                        <h3>${p.name}</h3>
+                        <div class="prospect-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Position</div>
+                                <div class="stat-value">${p.position}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Class</div>
+                                <div class="stat-value">${p.classYear}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Height</div>
+                                <div class="stat-value">${p.height}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Location</div>
+                                <div class="stat-value">${p.city}, ${p.state}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     performSearch() {
@@ -576,13 +1300,17 @@ class HoopPortalApp {
         const state = document.getElementById('filterState')?.value || '';
         const position = document.getElementById('filterPosition')?.value || '';
         const classYear = document.getElementById('filterClassYear')?.value || '';
+        const gender = document.getElementById('filterGender')?.value || '';
 
-        let results = this.mockPlayers.filter(p => {
-            if (name && !p.name.toLowerCase().includes(name.toLowerCase())) return false;
-            if (city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
+        const allPlayers = [...this.mockPlayers, ...this.realPlayers];
+
+        let results = allPlayers.filter(p => {
+            if (name && !p.name?.toLowerCase().includes(name.toLowerCase())) return false;
+            if (city && !p.city?.toLowerCase().includes(city.toLowerCase())) return false;
             if (state && p.state !== state) return false;
             if (position && p.position !== position) return false;
             if (classYear && p.classYear != classYear) return false;
+            if (gender && p.gender !== gender) return false;
             return true;
         });
 
@@ -599,153 +1327,139 @@ class HoopPortalApp {
             return;
         }
 
-        container.innerHTML = prospects.map(p => `
-            <div class="prospect-item ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal(${p.id})">
-                <div class="prospect-item-avatar">${p.emoji}</div>
-                <div class="prospect-item-content">
-                    <div class="prospect-item-header">
-                        <div class="prospect-item-name">${p.name}</div>
-                        ${p.premium ? '<span class="premium-badge">⭐ PREMIUM</span>' : ''}
+        container.innerHTML = prospects.map(p => {
+            const avatarContent = p.avatar
+                ? `<img src="${p.avatar}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
+                : (p.emoji || '🏀');
+
+            return `
+                <div class="prospect-item ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal('${p.id}')">
+                    <div class="prospect-item-avatar">
+                        ${avatarContent}
                     </div>
-                    <div class="prospect-item-details">
-                        <div class="detail-item">
-                            <div class="detail-label">Position</div>
-                            <div class="detail-value">${p.position}</div>
+                    <div class="prospect-item-content">
+                        <div class="prospect-item-header">
+                            <div class="prospect-item-name">${p.name}</div>
+                            ${p.premium ? '<span class="premium-badge">⭐ PREMIUM</span>' : ''}
                         </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Height</div>
-                            <div class="detail-value">${p.height}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Weight</div>
-                            <div class="detail-value">${p.weight} lbs</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">GPA</div>
-                            <div class="detail-value">${p.gpa}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Class</div>
-                            <div class="detail-value">${p.classYear}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Location</div>
-                            <div class="detail-value">${p.city}, ${p.state}</div>
+                        <div class="prospect-item-details">
+                            <div class="detail-item">
+                                <div class="detail-label">Position</div>
+                                <div class="detail-value">${p.position}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Height</div>
+                                <div class="detail-value">${p.height}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Weight</div>
+                                <div class="detail-value">${p.weight} lbs</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Class</div>
+                                <div class="detail-value">${p.classYear}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Location</div>
+                                <div class="detail-value">${p.city}, ${p.state}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     resetFilters() {
-        document.getElementById('filterPlayerName').value = '';
-        document.getElementById('filterCity').value = '';
-        document.getElementById('filterState').value = '';
-        document.getElementById('filterPosition').value = '';
-        document.getElementById('filterClassYear').value = '';
-        document.getElementById('searchProspectsContainer').innerHTML = '';
+        if (document.getElementById('filterPlayerName')) document.getElementById('filterPlayerName').value = '';
+        if (document.getElementById('filterCity')) document.getElementById('filterCity').value = '';
+        if (document.getElementById('filterState')) document.getElementById('filterState').value = '';
+        if (document.getElementById('filterPosition')) document.getElementById('filterPosition').value = '';
+        if (document.getElementById('filterClassYear')) document.getElementById('filterClassYear').value = '';
+        if (document.getElementById('filterGender')) document.getElementById('filterGender').value = '';
+        const container = document.getElementById('searchProspectsContainer');
+        if (container) container.innerHTML = '';
     }
 
-    showPlayerModal(playerId) {
-        const player = this.mockPlayers.find(p => p.id === playerId);
+    async showPlayerModal(playerId) {
+        const allPlayers = [...this.mockPlayers, ...this.realPlayers];
+        const player = allPlayers.find(p => String(p.id) === String(playerId));
+
         if (!player) return;
 
-        const modalBody = document.getElementById('playerModalBody');
+        let playerStats = { ppg: null, apg: null, rpg: null, fg: null, '3p': null, spg: null, bpg: null, ft: null, tov: null };
+
+        if (player.realProfile) {
+            try {
+                const { data: statsData } = await supabaseClient
+                    .from('player_stats')
+                    .select('*')
+                    .eq('player_id', playerId)
+                    .maybeSingle();
+
+                if (statsData) {
+                    playerStats = {
+                        ppg: statsData.ppg,
+                        apg: statsData.apg,
+                        rpg: statsData.rpg,
+                        fg: statsData.fg_percent,
+                        '3p': statsData.three_p_percent,
+                        spg: statsData.spg,
+                        bpg: statsData.bpg,
+                        ft: statsData.ft_percent,
+                        tov: statsData.tov
+                    };
+                }
+            } catch (err) {
+                console.error('Load stats error:', err);
+            }
+        }
+
+        let profilePic = player.avatar || player.emoji || '🏀';
+
         const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
 
-        // Get player stats from localStorage
-        const stats = localStorage.getItem(`hoopportal_player_${playerId}_stats`);
-        const playerStats = stats ? JSON.parse(stats) : { ppg: null, apg: null, rpg: null, fg: null };
-
-        // Get player profile picture
-        const pfp = localStorage.getItem(`hoopportal_player_${playerId}_pfp`);
-        const profilePic = pfp || player.emoji;
-        const isEmoji = profilePic === player.emoji;
-
+        const modalBody = document.getElementById('playerModalBody');
         modalBody.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
-                <!-- MAIN INFO -->
                 <div>
                     <div style="text-align: center; margin-bottom: 2rem;">
-                        <div style="font-size: 4rem; margin-bottom: 1rem; ${isEmoji ? '' : 'display: none;'}">${isEmoji ? profilePic : ''}</div>
-                        ${!isEmoji ? `<img src="${profilePic}" alt="${player.name}" style="width: 120px; height: 120px; border-radius: 12px; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : ''}
+                        ${profilePic.startsWith('http') ? `<img src="${profilePic}" alt="${player.name}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : `<div style="font-size: 4rem; margin-bottom: 1rem;">${profilePic}</div>`}
                         <h2 style="margin-bottom: 0.5rem;">${player.name}</h2>
                         ${player.premium ? '<p style="color: var(--primary-orange); font-weight: 700; margin-bottom: 1rem;">⭐ PREMIUM PLAYER</p>' : ''}
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">Position</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.position}</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">Height</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.height}</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">Weight</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.weight} lbs</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">Class Year</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.classYear}</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">School</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.school}</p>
-                        </div>
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem;">Location</p>
-                            <p style="font-weight: 700; font-size: 1.1rem;">${player.city}, ${player.state}</p>
-                        </div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Position</p><p style="font-weight: 700; font-size: 1.1rem;">${player.position || '—'}</p></div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Height</p><p style="font-weight: 700; font-size: 1.1rem;">${player.height || '—'}</p></div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Weight</p><p style="font-weight: 700; font-size: 1.1rem;">${player.weight || '—'} lbs</p></div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Class Year</p><p style="font-weight: 700; font-size: 1.1rem;">${player.classYear || '—'}</p></div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">School</p><p style="font-weight: 700; font-size: 1.1rem;">${player.school || '—'}</p></div>
+                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Location</p><p style="font-weight: 700; font-size: 1.1rem;">${player.city || '—'}, ${player.state || ''}</p></div>
                     </div>
 
                     <div style="background-color: var(--secondary-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--border-color);">
                         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Game Style</p>
-                        <p style="font-weight: 600; margin-bottom: 1.5rem;">${player.description}</p>
+                        <p style="font-weight: 600; margin-bottom: 1.5rem;">${player.description || 'No description yet'}</p>
                         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Coach Type</p>
-                        <p style="font-weight: 600;">${player.coachType}</p>
+                        <p style="font-weight: 600;">${player.coachType || '—'}</p>
                     </div>
 
-                    <div style="background-color: var(--secondary-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--border-color);">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Location</p>
-                        <p style="font-weight: 700; margin-bottom: 1.5rem;">${player.city}, ${player.state}</p>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Transcript</p>
-                        <a href="${player.transcript}" target="_blank" style="color: var(--primary-orange); text-decoration: none; font-weight: 600;">📄 View Transcript</a>
-                    </div>
-
-                    <!-- STATS SIDEBAR MOVED BELOW -->
-                    <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); margin-bottom: 2rem;">
-                        <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; padding-bottom: 0.75rem; border-bottom: 1px solid #3a3f47; font-weight: 700; color: #f0f0f0;">Season Stats</h3>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">PPG</div>
-                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.ppg || '—'}</div>
-                            </div>
-                            <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">APG</div>
-                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.apg || '—'}</div>
-                            </div>
-                            <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">RPG</div>
-                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.rpg || '—'}</div>
-                            </div>
-                            <div style="background: #1e2025; border: 1px solid #3a3f47; border-radius: 8px; padding: 1rem; text-align: center;">
-                                <div style="font-size: 0.8rem; color: #a0a8b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">FG%</div>
-                                <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-orange);">${playerStats.fg ? playerStats.fg + '%' : '—'}</div>
-                            </div>
+                    <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                        <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">Season Stats</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                            ${[{ label: 'PPG', value: playerStats.ppg }, { label: 'APG', value: playerStats.apg }, { label: 'RPG', value: playerStats.rpg }, { label: 'FG%', value: playerStats.fg }, { label: '3P%', value: playerStats['3p'] }, { label: 'SPG', value: playerStats.spg }, { label: 'BPG', value: playerStats.bpg }, { label: 'FT%', value: playerStats.ft }, { label: 'TOV', value: playerStats.tov }].map(stat => `
+                                <div style="background: #1e2025; border-radius: 12px; padding: 1.25rem; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: #a0a8b8; margin-bottom: 0.75rem;">${stat.label}</div>
+                                    <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${stat.value ?? '—'}</div>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
 
-                    <!-- BUTTONS AT BOTTOM -->
-                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                        <button class="btn btn-primary btn-block" onclick="app.likePlayer(${playerId})" id="likeBtn" style="${likeButtonStyle}; padding: 1rem 1.75rem; font-size: 1rem;">
-                            ${player.liked ? '❤️ Liked (' + player.likes + ')' : '🤍 Like (' + player.likes + ')'}
-                        </button>
-                        <button class="btn btn-primary btn-block" style="padding: 1rem 1.75rem; font-size: 1rem;">Contact Player</button>
-                    </div>
+                    <button class="btn btn-primary btn-block" onclick="app.likePlayer('${playerId}')" id="likeBtn" style="${likeButtonStyle}; padding: 1rem 1.75rem; font-size: 1rem;">
+                        ${player.liked ? `❤️ Liked (${player.likes})` : `🤍 Like (${player.likes})`}
+                    </button>
                 </div>
             </div>
         `;
@@ -753,116 +1467,93 @@ class HoopPortalApp {
         document.getElementById('playerModal').classList.add('show');
     }
 
-    likePlayer(playerId) {
-        const player = this.mockPlayers.find(p => p.id === playerId);
+    async likePlayer(playerId) {
+        const player = this.mockPlayers.find(p => String(p.id) === String(playerId)) ||
+            this.realPlayers.find(p => String(p.id) === String(playerId));
+
         if (!player) return;
+
+        if (String(playerId) === String(this.currentUser?.id)) {
+            this.showNotification("You can't like your own profile", 'error');
+            return;
+        }
 
         if (player.liked) {
             player.liked = false;
-            player.likes -= 1;
+            player.likes = Math.max(0, (player.likes || 0) - 1);
         } else {
             player.liked = true;
-            player.likes += 1;
+            player.likes = (player.likes || 0) + 1;
         }
 
-        // Store liked players in localStorage
-        const likedPlayers = JSON.parse(localStorage.getItem('hoopportal_liked_players') || '[]');
-        if (player.liked) {
-            if (!likedPlayers.includes(playerId)) {
-                likedPlayers.push(playerId);
+        if (this.currentUser) {
+            if (player.liked) {
+                if (!this.userLikedPlayers.includes(playerId)) {
+                    this.userLikedPlayers.push(playerId);
+                }
+            } else {
+                const index = this.userLikedPlayers.indexOf(playerId);
+                if (index > -1) {
+                    this.userLikedPlayers.splice(index, 1);
+                }
+            }
+            this.saveUserData();
+
+            if (player.realProfile) {
+                await this.saveLikedToSupabase(playerId, player.liked);
             }
         } else {
-            const index = likedPlayers.indexOf(playerId);
-            if (index > -1) {
-                likedPlayers.splice(index, 1);
+            const likedPlayers = JSON.parse(localStorage.getItem('hoopportal_liked_players') || '[]');
+            if (player.liked) {
+                if (!likedPlayers.includes(playerId)) {
+                    likedPlayers.push(playerId);
+                }
+            } else {
+                const index = likedPlayers.indexOf(playerId);
+                if (index > -1) {
+                    likedPlayers.splice(index, 1);
+                }
             }
+            localStorage.setItem('hoopportal_liked_players', JSON.stringify(likedPlayers));
         }
-        localStorage.setItem('hoopportal_liked_players', JSON.stringify(likedPlayers));
 
-        // Update button
         const likeBtn = document.getElementById('likeBtn');
         if (likeBtn) {
             if (player.liked) {
                 likeBtn.style.backgroundColor = 'var(--primary-orange)';
                 likeBtn.style.color = 'white';
-                likeBtn.textContent = '❤️ Liked (' + player.likes + ')';
+                likeBtn.textContent = `❤️ Liked (${player.likes})`;
             } else {
                 likeBtn.style.backgroundColor = '';
                 likeBtn.style.color = '';
-                likeBtn.textContent = '🤍 Like (' + player.likes + ')';
+                likeBtn.textContent = `🤍 Like (${player.likes})`;
             }
         }
 
         this.showNotification(player.liked ? 'Player liked!' : 'Like removed', 'success');
     }
 
-    // ============================================
-    // PROFILE FORMS
-    // ============================================
-    handleBasicInfo(e) {
-        e.preventDefault();
-        if (!this.currentUser) {
-            this.showNotification('Please log in first', 'error');
-            return;
+    async saveLikedToSupabase(playerId, isLiked) {
+        if (!this.currentUser) return;
+
+        try {
+            if (isLiked) {
+                await supabaseClient
+                    .from('liked_players')
+                    .insert({
+                        user_id: this.currentUser.id,
+                        player_id: playerId
+                    });
+            } else {
+                await supabaseClient
+                    .from('liked_players')
+                    .delete()
+                    .eq('user_id', this.currentUser.id)
+                    .eq('player_id', playerId);
+            }
+        } catch (error) {
+            console.error('Save liked error:', error);
         }
-
-        const basicInfo = {
-            firstName: document.getElementById('firstName').value,
-            lastName: document.getElementById('lastName').value,
-            height: document.getElementById('height').value,
-            weight: document.getElementById('weight').value,
-            position: document.getElementById('position').value,
-            classYear: document.getElementById('classYear').value,
-            gpa: document.getElementById('gpa').value,
-            transcript: document.getElementById('transcript').value,
-            school: document.getElementById('school').value,
-            transferSchool: document.getElementById('transferSchool').value,
-            city: document.getElementById('city').value,
-            state: document.getElementById('state').value
-        };
-
-        this.currentUser.basicInfo = basicInfo;
-        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
-        this.updateQuickProfile();
-        this.showNotification('Basic information saved!', 'success');
-    }
-
-    handleGameDescription(e) {
-        e.preventDefault();
-        if (!this.currentUser) {
-            this.showNotification('Please log in first', 'error');
-            return;
-        }
-
-        this.currentUser.gameDescription = {
-            gameStyle: document.getElementById('gameDescription').value,
-            coachType: document.getElementById('coachType').value
-        };
-
-        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
-        this.showNotification('Game description saved!', 'success');
-    }
-
-    handleContactInfo(e) {
-        e.preventDefault();
-        if (!this.currentUser) {
-            this.showNotification('Please log in first', 'error');
-            return;
-        }
-
-        this.currentUser.contactInfo = {
-            playerEmail: document.getElementById('playerEmail').value,
-            playerPhone: document.getElementById('playerPhone').value,
-            parentName: document.getElementById('parentName').value,
-            parentEmail: document.getElementById('parentEmail').value,
-            parentPhone: document.getElementById('parentPhone').value,
-            parentName2: document.getElementById('parentName2').value,
-            parentEmail2: document.getElementById('parentEmail2').value,
-            parentPhone2: document.getElementById('parentPhone2').value
-        };
-
-        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
-        this.showNotification('Contact information saved!', 'success');
     }
 
     addHighlightField() {
@@ -871,7 +1562,7 @@ class HoopPortalApp {
             return;
         }
 
-        const maxClips = this.currentUser.subscription === 'premium' ? 5 : 2;
+        const maxClips = this.currentUser.subscription === 'premium' ? 5 : 3;
         const container = document.getElementById('highlightsContainer');
         const currentCount = container.querySelectorAll('.highlight-item').length;
 
@@ -883,11 +1574,15 @@ class HoopPortalApp {
         const newField = document.createElement('div');
         newField.className = 'highlight-item';
         newField.innerHTML = `
-            <input type="url" placeholder="Paste YouTube or Vimeo link..." value="">
-            <button type="button" class="btn btn-secondary" onclick="this.parentElement.remove()">Remove</button>
+            <input type="url" placeholder="Paste YouTube or Vimeo link..." class="highlight-url">
+            <button type="button" class="btn btn-secondary remove-highlight">Remove</button>
         `;
 
         container.appendChild(newField);
+
+        newField.querySelector('.remove-highlight').addEventListener('click', () => {
+            newField.remove();
+        });
     }
 
     selectPlan(plan) {
@@ -907,9 +1602,6 @@ class HoopPortalApp {
         setTimeout(() => window.location.href = 'profile.html', 1500);
     }
 
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
     closeModal(modal) {
         modal.classList.remove('show');
     }
@@ -945,30 +1637,15 @@ class HoopPortalApp {
                     color: white;
                 }
                 @keyframes slideIn {
-                    from {
-                        transform: translateX(400px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
                 }
                 @keyframes slideOut {
-                    from {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                    to {
-                        transform: translateX(400px);
-                        opacity: 0;
-                    }
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(400px); opacity: 0; }
                 }
                 @media (max-width: 768px) {
-                    .notification {
-                        left: 20px;
-                        right: 20px;
-                    }
+                    .notification { left: 20px; right: 20px; }
                 }
             `;
             document.head.appendChild(style);
@@ -981,20 +1658,23 @@ class HoopPortalApp {
     loadPageContent() {
         const path = window.location.pathname.split('/').pop() || 'index.html';
 
+        if (window.location.hash === '#') {
+            return;
+        }
+
         if (path.includes('index.html') || path === '') {
-            this.displayProspectsHome(this.mockPlayers);
+            // Show real players only (mock players removed)
+            this.displayProspectsHome(this.realPlayers.slice(0, 20));
         } else if (path.includes('search.html')) {
             // Will populate on search
         } else if (path.includes('profile.html')) {
             this.loadProfileStats();
-            this.updateQuickProfile();
+            this.loadPlayerProfile();
+            this.loadGoogleProfilePicture();
         }
     }
 }
 
-// ============================================
-// INITIALIZE APP
-// ============================================
 let app;
 document.addEventListener('DOMContentLoaded', () => {
     app = new HoopPortalApp();
