@@ -2560,7 +2560,6 @@ class HoopPortalApp {
             return m;
         });
     }
-    // Add this to your app.js - this will call your Netlify function
     async selectPlan(plan) {
         if (!this.currentUser) {
             this.showNotification('Please log in first to select a plan', 'error');
@@ -2568,7 +2567,7 @@ class HoopPortalApp {
             return;
         }
 
-        // Price IDs - replace with your actual Stripe Price IDs
+        // Price IDs
         const priceIds = {
             basic: 'price_1TZHdpPv1yKOz6gv9mvr8OPS',
             premium: 'price_1TZHeNPv1yKOz6gvZ7hotmwm'
@@ -2576,38 +2575,24 @@ class HoopPortalApp {
 
         const priceId = priceIds[plan];
 
-        if (!priceId || priceId.includes('placeholder')) {
-            // Fallback to mock mode (no Stripe)
-            this.mockSelectPlan(plan);
-            return;
-        }
-
-        this.showNotification('Redirecting to checkout...', 'success');
+        this.showNotification('Redirecting to Stripe checkout...', 'success');
 
         try {
-            // Call your Netlify function
-            const response = await fetch('/.netlify/functions/create-checkout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    priceId: priceId,
-                    userId: this.currentUser.id,
-                    userEmail: this.currentUser.email,
-                    planType: plan,
-                    successUrl: `${window.location.origin}/profile.html`,
-                    cancelUrl: `${window.location.origin}/plans.html`
-                })
+            // Initialize Stripe with your publishable key
+            const stripe = Stripe('pk_live_51TXqwzPv1yKOz6gvVbf62GLt3Zj706BBWcs1uGoNcvOLtDlxSjp6f4yZvG8yGMZkEa3tja7nAhXL2D63qKlQ0uis00qHVttf1n');
+
+            // Redirect to Stripe Checkout
+            const { error } = await stripe.redirectToCheckout({
+                lineItems: [{ price: priceId, quantity: 1 }],
+                mode: 'subscription',
+                successUrl: `${window.location.origin}/profile.html?session_id={CHECKOUT_SESSION_ID}`,
+                cancelUrl: `${window.location.origin}/plans.html`,
+                customerEmail: this.currentUser.email,
             });
 
-            const data = await response.json();
-
-            if (data.url) {
-                // Redirect to Stripe Checkout
-                window.location.href = data.url;
-            } else {
-                this.showNotification('Failed to create checkout session', 'error');
+            if (error) {
+                console.error('Stripe error:', error);
+                this.showNotification(error.message, 'error');
             }
         } catch (error) {
             console.error('Checkout error:', error);
