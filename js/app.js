@@ -29,6 +29,7 @@ class HoopPortalApp {
         this.realPlayers = [];
         this.playerStats = {};
         this.userLikedPlayers = [];
+        this.highlightReels = [];
         this.init();
     }
 
@@ -886,6 +887,7 @@ class HoopPortalApp {
             }
 
             this.updateQuickProfile();
+            await this.loadHighlightReels();
 
         } catch (err) {
             console.error('Load profile error:', err);
@@ -1446,91 +1448,208 @@ class HoopPortalApp {
         if (container) container.innerHTML = '';
     }
 
-    async showPlayerModal(playerId) {
-        const allPlayers = [...this.mockPlayers, ...this.realPlayers];
-        const player = allPlayers.find(p => String(p.id) === String(playerId));
+   async showPlayerModal(playerId) {
+    const allPlayers = [...this.mockPlayers, ...this.realPlayers];
+    const player = allPlayers.find(p => String(p.id) === String(playerId));
 
-        if (!player) return;
+    if (!player) return;
 
-        let playerStats = { ppg: null, apg: null, rpg: null, fg: null, '3p': null, spg: null, bpg: null, ft: null, tov: null };
+    let playerStats = { ppg: null, apg: null, rpg: null, fg: null, '3p': null, spg: null, bpg: null, ft: null, tov: null };
+    let contactInfo = { playerEmail: null, playerPhone: null, parentName: null, parentEmail: null, parentPhone: null };
+    let playerHighlightReels = [];
 
-        if (player.realProfile) {
-            try {
-                const { data: statsData } = await supabaseClient
-                    .from('player_stats')
-                    .select('*')
-                    .eq('player_id', playerId)
-                    .maybeSingle();
-
-                if (statsData) {
-                    playerStats = {
-                        ppg: statsData.ppg,
-                        apg: statsData.apg,
-                        rpg: statsData.rpg,
-                        fg: statsData.fg_percent,
-                        '3p': statsData.three_p_percent,
-                        spg: statsData.spg,
-                        bpg: statsData.bpg,
-                        ft: statsData.ft_percent,
-                        tov: statsData.tov
-                    };
-                }
-            } catch (err) {
-                console.error('Load stats error:', err);
+    if (player.realProfile) {
+        try {
+            // Load stats
+            const { data: statsData } = await supabaseClient
+                .from('player_stats')
+                .select('*')
+                .eq('player_id', playerId)
+                .maybeSingle();
+            if (statsData) {
+                playerStats = {
+                    ppg: statsData.ppg,
+                    apg: statsData.apg,
+                    rpg: statsData.rpg,
+                    fg: statsData.fg_percent,
+                    '3p': statsData.three_p_percent,
+                    spg: statsData.spg,
+                    bpg: statsData.bpg,
+                    ft: statsData.ft_percent,
+                    tov: statsData.tov
+                };
             }
+
+            // Load contact info
+            const { data: contactData } = await supabaseClient
+                .from('player_contact')
+                .select('*')
+                .eq('player_id', playerId)
+                .maybeSingle();
+            if (contactData) {
+                contactInfo.playerEmail = contactData.player_email;
+                contactInfo.playerPhone = contactData.player_phone;
+            }
+
+            // Load parent/guardian info
+            const { data: guardians } = await supabaseClient
+                .from('parent_guardians')
+                .select('*')
+                .eq('player_id', playerId);
+            if (guardians && guardians.length > 0) {
+                const parent1 = guardians.find(g => g.parent_number === 1);
+                if (parent1) {
+                    contactInfo.parentName = parent1.name;
+                    contactInfo.parentEmail = parent1.email;
+                    contactInfo.parentPhone = parent1.phone;
+                }
+            }
+
+            // Load highlight reels
+            const { data: reelsData } = await supabaseClient
+                .from('highlight_reels')
+                .select('*')
+                .eq('player_id', playerId)
+                .order('created_at', { ascending: true });
+            if (reelsData) {
+                playerHighlightReels = reelsData;
+            }
+
+        } catch (err) {
+            console.error('Load player details error:', err);
         }
+    }
 
-        let profilePic = player.avatar || player.emoji || '🏀';
+    let profilePic = player.avatar || player.emoji || '🏀';
+    const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
 
-        const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
-
-        const modalBody = document.getElementById('playerModalBody');
-        modalBody.innerHTML = `
-            <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
-                <div>
-                    <div style="text-align: center; margin-bottom: 2rem;">
-                        ${profilePic.startsWith('http') ? `<img src="${profilePic}" alt="${player.name}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : `<div style="font-size: 4rem; margin-bottom: 1rem;">${profilePic}</div>`}
-                        <h2 style="margin-bottom: 0.5rem;">${player.name}</h2>
-                        ${player.premium ? '<p style="color: var(--primary-orange); font-weight: 700; margin-bottom: 1rem;">⭐ PREMIUM PLAYER</p>' : ''}
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Position</p><p style="font-weight: 700; font-size: 1.1rem;">${player.position || '—'}</p></div>
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Height</p><p style="font-weight: 700; font-size: 1.1rem;">${player.height || '—'}</p></div>
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Weight</p><p style="font-weight: 700; font-size: 1.1rem;">${player.weight || '—'} lbs</p></div>
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Class Year</p><p style="font-weight: 700; font-size: 1.1rem;">${player.classYear || '—'}</p></div>
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">School</p><p style="font-weight: 700; font-size: 1.1rem;">${player.school || '—'}</p></div>
-                        <div><p style="color: var(--text-muted); font-size: 0.9rem;">Location</p><p style="font-weight: 700; font-size: 1.1rem;">${player.city || '—'}, ${player.state || ''}</p></div>
-                    </div>
-
-                    <div style="background-color: var(--secondary-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--border-color);">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Game Style</p>
-                        <p style="font-weight: 600; margin-bottom: 1.5rem;">${player.description || 'No description yet'}</p>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Coach Type</p>
-                        <p style="font-weight: 600;">${player.coachType || '—'}</p>
-                    </div>
-
-                    <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-                        <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">Season Stats</h3>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-                            ${[{ label: 'PPG', value: playerStats.ppg }, { label: 'APG', value: playerStats.apg }, { label: 'RPG', value: playerStats.rpg }, { label: 'FG%', value: playerStats.fg }, { label: '3P%', value: playerStats['3p'] }, { label: 'SPG', value: playerStats.spg }, { label: 'BPG', value: playerStats.bpg }, { label: 'FT%', value: playerStats.ft }, { label: 'TOV', value: playerStats.tov }].map(stat => `
-                                <div style="background: #1e2025; border-radius: 12px; padding: 1.25rem; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: #a0a8b8; margin-bottom: 0.75rem;">${stat.label}</div>
-                                    <div style="font-size: 2rem; font-weight: 900; color: var(--primary-orange);">${stat.value ?? '—'}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary btn-block" onclick="app.likePlayer('${playerId}')" id="likeBtn" style="${likeButtonStyle}; padding: 1rem 1.75rem; font-size: 1rem;">
-                        ${player.liked ? `❤️ Liked (${player.likes})` : `🤍 Like (${player.likes})`}
-                    </button>
+    // Generate highlight reels HTML
+    let highlightReelsHtml = '';
+    if (playerHighlightReels.length > 0) {
+        highlightReelsHtml = `
+            <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">🎥 Highlight Reels</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    ${playerHighlightReels.map(reel => {
+                        const embedUrl = this.getYouTubeEmbedUrl(reel.url);
+                        const title = reel.title || 'Watch Highlight';
+                        if (embedUrl) {
+                            const videoId = embedUrl.match(/embed\/([^?]+)/)?.[1];
+                            return `
+                                <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                                    <div style="background: #1e2025; border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
+                                        <div style="position: relative; background: #000;">
+                                            <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" 
+                                                 style="width: 100%; height: 120px; object-fit: cover; opacity: 0.8;">
+                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                                        font-size: 32px; color: white; text-shadow: 2px 2px 4px black;">▶️</div>
+                                        </div>
+                                        <div style="padding: 0.75rem; text-align: center;">
+                                            <div style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(title)}</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            `;
+                        } else {
+                            return `
+                                <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                                    <div style="background: #1e2025; border-radius: 12px; padding: 1rem; text-align: center;">
+                                        <div style="font-size: 2rem;">🎬</div>
+                                        <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;">${this.escapeHtml(title)}</div>
+                                    </div>
+                                </a>
+                            `;
+                        }
+                    }).join('')}
                 </div>
             </div>
         `;
-
-        document.getElementById('playerModal').classList.add('show');
     }
+
+    // Generate contact info HTML (only show if authenticated user is viewing)
+    let contactHtml = '';
+    if (this.currentUser) {
+        contactHtml = `
+            <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">📞 Contact Information</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    ${contactInfo.playerEmail ? `
+                        <div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Player Email</div>
+                            <div style="font-weight: 600;">${contactInfo.playerEmail}</div>
+                        </div>
+                    ` : ''}
+                    ${contactInfo.playerPhone ? `
+                        <div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Player Phone</div>
+                            <div style="font-weight: 600;">${contactInfo.playerPhone}</div>
+                        </div>
+                    ` : ''}
+                    ${contactInfo.parentName ? `
+                        <div style="grid-column: span 2; margin-top: 0.5rem;">
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Parent/Guardian</div>
+                            <div style="font-weight: 600;">${this.escapeHtml(contactInfo.parentName)}</div>
+                            ${contactInfo.parentEmail ? `<div style="font-size: 0.85rem;">${contactInfo.parentEmail}</div>` : ''}
+                            ${contactInfo.parentPhone ? `<div style="font-size: 0.85rem;">${contactInfo.parentPhone}</div>` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+                ${!contactInfo.playerEmail && !contactInfo.playerPhone && !contactInfo.parentName ? '<div style="color: var(--text-muted); text-align: center;">No contact information provided</div>' : ''}
+            </div>
+        `;
+    }
+
+    const modalBody = document.getElementById('playerModalBody');
+    modalBody.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+            <div>
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    ${profilePic.startsWith('http') ? `<img src="${profilePic}" alt="${player.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : `<div style="font-size: 3rem; margin-bottom: 1rem;">${profilePic}</div>`}
+                    <h2 style="margin-bottom: 0.25rem;">${player.name}</h2>
+                    ${player.premium ? '<p style="color: var(--primary-orange); font-weight: 700; margin-bottom: 0.5rem;">⭐ PREMIUM PLAYER</p>' : ''}
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Position</p><p style="font-weight: 700;">${player.position || '—'}</p></div>
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Height</p><p style="font-weight: 700;">${player.height || '—'}</p></div>
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Weight</p><p style="font-weight: 700;">${player.weight || '—'} lbs</p></div>
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Class Year</p><p style="font-weight: 700;">${player.classYear || '—'}</p></div>
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">School</p><p style="font-weight: 700;">${player.school || '—'}</p></div>
+                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Location</p><p style="font-weight: 700;">${player.city || '—'}, ${player.state || ''}</p></div>
+                </div>
+
+                ${contactHtml}
+
+                <div style="background-color: var(--secondary-dark); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🏀 Game Style</p>
+                    <p style="font-weight: 600; margin-bottom: 1rem;">${player.description || 'No description yet'}</p>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🎯 Looking For</p>
+                    <p style="font-weight: 600;">${player.coachType || '—'}</p>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1rem; margin-bottom: 1rem; font-weight: 700;">📊 Season Stats</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem;">
+                        ${[{ label: 'PPG', value: playerStats.ppg }, { label: 'APG', value: playerStats.apg }, { label: 'RPG', value: playerStats.rpg }, { label: 'FG%', value: playerStats.fg }, { label: '3P%', value: playerStats['3p'] }, { label: 'SPG', value: playerStats.spg }, { label: 'BPG', value: playerStats.bpg }, { label: 'FT%', value: playerStats.ft }, { label: 'TOV', value: playerStats.tov }].map(stat => `
+                            <div style="background: #1e2025; border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 0.7rem; color: #a0a8b8;">${stat.label}</div>
+                                <div style="font-size: 1.3rem; font-weight: 900; color: var(--primary-orange);">${stat.value ?? '—'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                ${highlightReelsHtml}
+
+                <button class="btn btn-primary btn-block" onclick="app.likePlayer('${playerId}')" id="likeBtn" style="${likeButtonStyle}; padding: 0.75rem;">
+                    ${player.liked ? `❤️ Liked (${player.likes})` : `🤍 Like (${player.likes})`}
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('playerModal').classList.add('show');
+}
 
     async likePlayer(playerId) {
         const player = this.mockPlayers.find(p => String(p.id) === String(playerId)) ||
@@ -1628,25 +1747,366 @@ class HoopPortalApp {
         }
 
         const maxClips = this.currentUser.subscription === 'premium' ? 5 : 3;
-        const container = document.getElementById('highlightsContainer');
-        const currentCount = container.querySelectorAll('.highlight-item').length;
+        const currentCount = this.highlightReels?.length || 0;
+        const unsavedCount = document.querySelectorAll('.highlight-item:not(.saved-highlight)').length;
 
-        if (currentCount >= maxClips) {
+        if (currentCount + unsavedCount >= maxClips) {
             this.showNotification(`You can only add up to ${maxClips} highlight reels with your plan`, 'error');
             return;
         }
 
-        const newField = document.createElement('div');
-        newField.className = 'highlight-item';
-        newField.innerHTML = `
-            <input type="url" placeholder="Paste YouTube or Vimeo link..." class="highlight-url">
-            <button type="button" class="btn btn-secondary remove-highlight">Remove</button>
-        `;
+        const optionsPanel = document.createElement('div');
+        optionsPanel.className = 'highlight-options-panel';
+        optionsPanel.innerHTML = `
+        <div class="highlight-options">
+            <div class="highlight-option" data-type="camera">
+                <div class="option-icon">📱</div>
+                <div class="option-label">Camera / Gallery</div>
+                <div class="option-desc">Upload from your device</div>
+            </div>
+            <div class="highlight-option" data-type="link">
+                <div class="option-icon">🔗</div>
+                <div class="option-label">Video Link</div>
+                <div class="option-desc">YouTube or Vimeo URL</div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-secondary cancel-options">Cancel</button>
+    `;
 
-        container.appendChild(newField);
+        const container = document.getElementById('highlightsContainer');
+        container.appendChild(optionsPanel);
 
-        newField.querySelector('.remove-highlight').addEventListener('click', () => {
-            newField.remove();
+        optionsPanel.querySelectorAll('.highlight-option').forEach(option => {
+            option.addEventListener('click', async () => {
+                const type = option.dataset.type;
+                optionsPanel.remove();
+                if (type === 'camera') {
+                    this.showFileUploadOption();
+                } else if (type === 'link') {
+                    this.showLinkInputOption();
+                }
+            });
+        });
+
+        optionsPanel.querySelector('.cancel-options').addEventListener('click', () => {
+            optionsPanel.remove();
+        });
+    }
+
+    getYouTubeEmbedUrl(url) {
+        if (!url) return null;
+
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+            /youtube\.com\/embed\/([^&\n?#]+)/,
+            /youtube\.com\/shorts\/([^&\n?#]+)/
+        ];
+
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                const videoId = match[1].split('?')[0].split('&')[0];
+                return `https://www.youtube.com/embed/${videoId}`;
+            }
+        }
+
+        const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+        if (vimeoMatch) {
+            return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+        }
+
+        return null;
+    }
+
+    showFileUploadOption() {
+        const maxClips = this.currentUser.subscription === 'premium' ? 5 : 3;
+        const currentCount = this.highlightReels?.length || 0;
+        const unsavedCount = document.querySelectorAll('.highlight-item:not(.saved-highlight)').length;
+
+        if (currentCount + unsavedCount >= maxClips) {
+            this.showNotification(`You can only add up to ${maxClips} highlight reels with your plan`, 'error');
+            return;
+        }
+
+        const uploadDiv = document.createElement('div');
+        uploadDiv.className = 'highlight-item highlight-upload';
+        uploadDiv.innerHTML = `
+        <div class="file-upload-area" style="border: 2px dashed var(--border-color); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer;">
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎥</div>
+            <div style="margin-bottom: 0.5rem; font-weight: 600;">Click to upload video</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">MP4, MOV, or WebM (Max 50MB)</div>
+        </div>
+        <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display: none;">
+        <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary btn-small cancel-upload">Cancel</button>
+        </div>
+    `;
+
+        const container = document.getElementById('highlightsContainer');
+        container.appendChild(uploadDiv);
+
+        const fileInput = uploadDiv.querySelector('input[type="file"]');
+        const uploadArea = uploadDiv.querySelector('.file-upload-area');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--primary-orange)';
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = 'var(--border-color)';
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--border-color)';
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('video/')) {
+                this.uploadVideoFile(file, uploadDiv);
+            } else {
+                this.showNotification('Please drop a valid video file', 'error');
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) this.uploadVideoFile(e.target.files[0], uploadDiv);
+        });
+        uploadDiv.querySelector('.cancel-upload').addEventListener('click', () => uploadDiv.remove());
+    }
+
+    showLinkInputOption() {
+        const maxClips = this.currentUser.subscription === 'premium' ? 5 : 3;
+        const currentCount = this.highlightReels?.length || 0;
+        const unsavedCount = document.querySelectorAll('.highlight-item:not(.saved-highlight)').length;
+
+        if (currentCount + unsavedCount >= maxClips) {
+            this.showNotification(`You can only add up to ${maxClips} highlight reels with your plan`, 'error');
+            return;
+        }
+
+        const linkDiv = document.createElement('div');
+        linkDiv.className = 'highlight-item';
+        linkDiv.innerHTML = `
+        <input type="url" placeholder="Paste YouTube or Vimeo link..." class="highlight-url">
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button type="button" class="btn btn-primary btn-small save-new-highlight">Save Reel</button>
+            <button type="button" class="btn btn-secondary btn-small cancel-link">Cancel</button>
+        </div>
+    `;
+
+        const container = document.getElementById('highlightsContainer');
+        container.appendChild(linkDiv);
+
+        linkDiv.querySelector('.save-new-highlight').addEventListener('click', async () => {
+            const urlInput = linkDiv.querySelector('.highlight-url');
+            if (!urlInput.value.trim()) {
+                this.showNotification('Please enter a URL', 'error');
+                return;
+            }
+            await this.addHighlightReelFromUrl(urlInput.value.trim());
+            linkDiv.remove();
+        });
+        linkDiv.querySelector('.cancel-link').addEventListener('click', () => linkDiv.remove());
+    }
+
+    async uploadVideoFile(file, uploadDivElement) {
+        if (file.size > 50 * 1024 * 1024) {
+            this.showNotification('Video file must be under 50MB', 'error');
+            uploadDivElement.remove();
+            return;
+        }
+
+        uploadDivElement.innerHTML = `<div style="text-align: center; padding: 1.5rem;"><div>Uploading video...</div></div>`;
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `highlights/${this.currentUser.id}-${Date.now()}.${fileExt}`;
+
+            const { error: uploadError } = await supabaseClient.storage
+                .from('highlight_reels')
+                .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabaseClient.storage
+                .from('highlight_reels')
+                .getPublicUrl(fileName);
+
+            const { data, error } = await supabaseClient
+                .from('highlight_reels')
+                .insert({
+                    player_id: this.currentUser.id,
+                    url: publicUrl,
+                    title: file.name.split('.')[0].substring(0, 100),
+                    video_type: 'file',
+                    views: 0
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            this.highlightReels.push(data);
+            uploadDivElement.remove();
+            this.displayHighlightReels();
+            this.showNotification('Video uploaded successfully!', 'success');
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showNotification(error.message || 'Failed to upload video', 'error');
+            uploadDivElement.remove();
+        }
+    }
+
+    async addHighlightReelFromUrl(url) {
+        if (!this.currentUser) {
+            this.showNotification('Please log in first', 'error');
+            return;
+        }
+
+        const maxClips = this.currentUser.subscription === 'premium' ? 5 : 3;
+        if ((this.highlightReels?.length || 0) >= maxClips) {
+            this.showNotification(`You can only add up to ${maxClips} highlight reels`, 'error');
+            return;
+        }
+
+        const embedUrl = this.getYouTubeEmbedUrl(url);
+        if (!embedUrl) {
+            this.showNotification('Please enter a valid YouTube or Vimeo URL', 'error');
+            return;
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('highlight_reels')
+                .insert({
+                    player_id: this.currentUser.id,
+                    url: url,
+                    title: null,
+                    video_type: url.includes('youtube') ? 'youtube' : (url.includes('vimeo') ? 'vimeo' : 'file'),
+                    views: 0
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            this.highlightReels.push(data);
+            this.displayHighlightReels();
+            this.showNotification('Highlight reel added!', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            this.showNotification(error.message || 'Failed to add', 'error');
+        }
+    }
+
+    async loadHighlightReels() {
+        if (!this.currentUser) return;
+        try {
+            const { data, error } = await supabaseClient
+                .from('highlight_reels')
+                .select('*')
+                .eq('player_id', this.currentUser.id)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            this.highlightReels = data || [];
+            this.displayHighlightReels();
+        } catch (error) {
+            console.error('Error loading highlight reels:', error);
+        }
+    }
+
+    displayHighlightReels() {
+        const container = document.getElementById('highlightsContainer');
+        if (!container) return;
+
+        const maxClips = this.currentUser?.subscription === 'premium' ? 5 : 3;
+        const limitText = document.getElementById('highlightLimit');
+        if (limitText) {
+            limitText.textContent = `You can upload up to ${maxClips} highlight reels. (${this.highlightReels?.length || 0}/${maxClips} used)`;
+        }
+
+        const existingItems = container.querySelectorAll('.highlight-item:not(.highlight-options-panel)');
+        existingItems.forEach(el => el.remove());
+
+        if (this.highlightReels && this.highlightReels.length > 0) {
+            this.highlightReels.forEach(reel => {
+                const embedUrl = this.getYouTubeEmbedUrl(reel.url);
+                const reelDiv = document.createElement('div');
+                reelDiv.className = 'highlight-item saved-highlight';
+                reelDiv.innerHTML = `
+                <div class="highlight-preview">
+                   ${embedUrl ? `<a href="${reel.url}" target="_blank" rel="noopener noreferrer">
+    <div style="position: relative; background: #000; border-radius:8px; overflow:hidden; height:180px;">
+        <img src="https://img.youtube.com/vi/${embedUrl.match(/embed\/([^?]+)/)[1]}/mqdefault.jpg" 
+             style="width:100%; height:100%; object-fit:cover; opacity:0.8;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); 
+                    font-size:48px; color:white; text-shadow:2px 2px 4px black;">▶️</div>
+    </div>
+</a>` : `<a href="${reel.url}" target="_blank">Watch Video 🔗</a>`}
+                    <div class="highlight-info">
+                        <input type="text" class="highlight-title-input" value="${this.escapeHtml(reel.title || '')}" placeholder="Video title">
+                        <button class="btn btn-small btn-primary save-title-btn" data-id="${reel.id}">Save</button>
+                        <button class="btn btn-small btn-danger delete-reel-btn" data-id="${reel.id}">Delete</button>
+                    </div>
+                </div>
+            `;
+                container.appendChild(reelDiv);
+            });
+        }
+
+        document.querySelectorAll('.save-title-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const reelId = btn.dataset.id;
+                const titleInput = btn.parentElement.querySelector('.highlight-title-input');
+                await this.updateHighlightTitle(reelId, titleInput.value);
+            });
+        });
+
+        document.querySelectorAll('.delete-reel-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const reelId = btn.dataset.id;
+                if (confirm('Delete this highlight reel?')) {
+                    await this.deleteHighlightReel(reelId);
+                }
+            });
+        });
+    }
+
+    async updateHighlightTitle(reelId, title) {
+        try {
+            await supabaseClient
+                .from('highlight_reels')
+                .update({ title: title })
+                .eq('id', reelId)
+                .eq('player_id', this.currentUser.id);
+            const reel = this.highlightReels.find(r => r.id === reelId);
+            if (reel) reel.title = title;
+            this.showNotification('Title updated!', 'success');
+        } catch (error) {
+            this.showNotification('Failed to update', 'error');
+        }
+    }
+
+    async deleteHighlightReel(reelId) {
+        try {
+            await supabaseClient
+                .from('highlight_reels')
+                .delete()
+                .eq('id', reelId)
+                .eq('player_id', this.currentUser.id);
+            this.highlightReels = this.highlightReels.filter(r => r.id !== reelId);
+            this.displayHighlightReels();
+            this.showNotification('Deleted!', 'success');
+        } catch (error) {
+            this.showNotification('Failed to delete', 'error');
+        }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function (m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
         });
     }
 
