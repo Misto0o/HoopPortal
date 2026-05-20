@@ -38,6 +38,7 @@ class HoopPortalApp {
         this.checkAuthStatus();
         await this.loadSearchPlayers();
         this.loadPageContent();
+        this.handleCheckoutSuccess();
     }
 
     setupEventListeners() {
@@ -2574,31 +2575,98 @@ class HoopPortalApp {
         };
 
         const priceId = priceIds[plan];
+        if (!priceId) {
+            this.showNotification('Invalid plan selected', 'error');
+            return;
+        }
 
-        this.showNotification('Redirecting to Stripe checkout...', 'success');
+        this.showNotification('Redirecting to checkout...', 'success');
 
         try {
-            // Initialize Stripe with your publishable key
-            const stripe = Stripe('pk_live_51TXqwzPv1yKOz6gvVbf62GLt3Zj706BBWcs1uGoNcvOLtDlxSjp6f4yZvG8yGMZkEa3tja7nAhXL2D63qKlQ0uis00qHVttf1n');
-
-            // Redirect to Stripe Checkout
-            const { error } = await stripe.redirectToCheckout({
-                lineItems: [{ price: priceId, quantity: 1 }],
-                mode: 'subscription',
-                successUrl: `${window.location.origin}/profile.html?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${window.location.origin}/plans.html`,
-                customerEmail: this.currentUser.email,
+            // Call Netlify function to create checkout session
+            const response = await fetch('/.netlify/functions/create-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    priceId: priceId,
+                    userId: this.currentUser.id,
+                    userEmail: this.currentUser.email,
+                    planType: plan,
+                    successUrl: `${window.location.origin}/profile.html`,
+                    cancelUrl: `${window.location.origin}/plans.html`
+                })
             });
 
-            if (error) {
-                console.error('Stripe error:', error);
-                this.showNotification(error.message, 'error');
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Checkout failed');
             }
+
+            const data = await response.json();
+
+            if (!data.url) {
+                throw new Error('No checkout URL returned');
+            }
+
+            // Redirect to Stripe checkout
+            window.location.href = data.url;
+
         } catch (error) {
             console.error('Checkout error:', error);
-            this.showNotification('Failed to start checkout. Please try again.', 'error');
+            this.showNotification(
+                error.message || 'Failed to start checkout. Please try again.',
+                'error'
+            );
         }
     }
+
+    async handleCheckoutSuccess() {
+        // Called when user returns from Stripe checkout
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+
+        if (sessionId && this.currentUser) {
+            try {
+                // Verify session on backend (optional but recommended)
+                const response = await fetch('/.netlify/functions/verify-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, userId: this.currentUser.id })
+                });
+
+                if (response.ok) {
+                    // Reload user data to get updated subscription
+                    const { data: userProfile } = await supabaseClient
+                        .from('user_profiles')
+                        .select('subscription, subscription_status')
+                        .eq('id', this.currentUser.id)
+                        .single();
+
+                    if (userProfile) {
+                        this.currentUser.subscription = userProfile.subscription;
+                        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+
+                        this.showNotification(
+                            `Welcome to ${userProfile.subscription === 'premium' ? 'Premium' : 'Basic'}! 🎉`,
+                            'success'
+                        );
+
+                        // Update UI
+                        this.loadSubscriptionStatus();
+                    }
+                }
+            } catch (error) {
+                console.error('Error handling checkout success:', error);
+            }
+
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+
+
 
     closeModal(modal) {
         modal.classList.remove('show');

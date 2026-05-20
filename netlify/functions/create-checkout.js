@@ -1,11 +1,11 @@
-// netlify/functions/create-checkout.js
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.handler = async (event) => {
-    // Only allow POST requests
+    // Only allow POST
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: 'Method not allowed' })
         };
     }
@@ -13,22 +13,50 @@ exports.handler = async (event) => {
     try {
         const { priceId, userId, userEmail, planType, successUrl, cancelUrl } = JSON.parse(event.body);
 
-        // Find or create customer
-        let customers = await stripe.customers.list({
-            email: userEmail,
-            limit: 1
-        });
+        // Validate required fields
+        if (!priceId || !userId || !userEmail || !planType) {
+            return {
+                statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Missing required fields' })
+            };
+        }
 
-        let customerId = customers.data[0]?.id;
+        // Validate plan type
+        if (!['basic', 'premium'].includes(planType)) {
+            return {
+                statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Invalid plan type' })
+            };
+        }
 
-        if (!customerId) {
-            const customer = await stripe.customers.create({
+        // Find or create Stripe customer
+        let customerId;
+        try {
+            const customers = await stripe.customers.list({
                 email: userEmail,
-                metadata: {
-                    supabase_user_id: userId
-                }
+                limit: 1
             });
-            customerId = customer.id;
+
+            if (customers.data.length > 0) {
+                customerId = customers.data[0].id;
+            } else {
+                const customer = await stripe.customers.create({
+                    email: userEmail,
+                    metadata: {
+                        supabase_user_id: userId
+                    }
+                });
+                customerId = customer.id;
+            }
+        } catch (error) {
+            console.error('Customer creation error:', error);
+            return {
+                statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Failed to create customer' })
+            };
         }
 
         // Create checkout session
@@ -52,13 +80,19 @@ exports.handler = async (event) => {
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ sessionId: session.id, url: session.url })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: session.id,
+                url: session.url
+            })
         };
+
     } catch (error) {
-        console.error('Stripe error:', error);
+        console.error('Checkout error:', error);
         return {
-            statusCode: 400,
-            body: JSON.stringify({ error: error.message })
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: error.message || 'Checkout failed' })
         };
     }
 };
