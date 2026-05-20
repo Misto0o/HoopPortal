@@ -1,6 +1,6 @@
 // ============================================
 // netlify/functions/create-checkout.js
-// NO NPM REQUIRED - Uses Stripe API directly
+// FIXED - GET request without body
 // ============================================
 
 exports.handler = async (event) => {
@@ -44,28 +44,27 @@ exports.handler = async (event) => {
             };
         }
 
-        // Step 1: Find or create Stripe customer (using Stripe API directly)
+        // Step 1: Find or create Stripe customer
         let customerId;
 
         try {
-            // List customers with this email
-            const listResponse = await fetch('https://api.stripe.com/v1/customers', {
+            // FIX: Use URL params for GET request, not body
+            const listUrl = new URL('https://api.stripe.com/v1/customers');
+            listUrl.searchParams.append('email', userEmail);
+            listUrl.searchParams.append('limit', '1');
+
+            const listResponse = await fetch(listUrl.toString(), {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${stripeSecretKey}`,
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: new URLSearchParams({
-                    email: userEmail,
-                    limit: 1
-                }).toString()
+                    'Authorization': `Bearer ${stripeSecretKey}`
+                }
             });
 
             const listData = await listResponse.json();
 
             if (listData.data && listData.data.length > 0) {
                 customerId = listData.data[0].id;
-                console.log('Found existing customer:', customerId);
+                console.log('✅ Found existing customer:', customerId);
             } else {
                 // Create new customer
                 const createResponse = await fetch('https://api.stripe.com/v1/customers', {
@@ -76,9 +75,7 @@ exports.handler = async (event) => {
                     },
                     body: new URLSearchParams({
                         email: userEmail,
-                        metadata: JSON.stringify({
-                            supabase_user_id: userId
-                        })
+                        'metadata[supabase_user_id]': userId
                     }).toString()
                 });
 
@@ -89,10 +86,10 @@ exports.handler = async (event) => {
                 }
 
                 customerId = customerData.id;
-                console.log('Created new customer:', customerId);
+                console.log('✅ Created new customer:', customerId);
             }
         } catch (error) {
-            console.error('Customer creation error:', error);
+            console.error('❌ Customer creation error:', error);
             return {
                 statusCode: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -138,7 +135,7 @@ exports.handler = async (event) => {
                 })
             };
         } catch (error) {
-            console.error('Checkout error:', error);
+            console.error('❌ Checkout error:', error);
             return {
                 statusCode: 500,
                 headers: { 'Content-Type': 'application/json' },
@@ -147,7 +144,7 @@ exports.handler = async (event) => {
         }
 
     } catch (error) {
-        console.error('General error:', error);
+        console.error('❌ General error:', error);
         return {
             statusCode: 500,
             headers: { 'Content-Type': 'application/json' },
