@@ -3,10 +3,49 @@
 // NO NPM REQUIRED - Uses Stripe API directly
 // ============================================
 
-// NOTE: The webhook verification requires cryptography
-// We'll use Node's built-in crypto module (no npm needed)
-
 const crypto = require('crypto');
+
+// Helper to call Supabase REST API directly
+async function updateSupabaseSubscription(userId, status, planType, customerId) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+        console.error('Missing Supabase credentials');
+        return false;
+    }
+    
+    const updateData = {
+        subscription_status: status,
+        subscription_plan: planType,
+        subscription_date: new Date().toISOString(),
+        stripe_customer_id: customerId
+    };
+    
+    try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            console.error('Supabase update error:', error);
+            return false;
+        }
+        
+        console.log(`✅ Updated user ${userId} to ${status}`);
+        return true;
+    } catch (error) {
+        console.error('Supabase update error:', error);
+        return false;
+    }
+}
 
 exports.handler = async (event) => {
     const signature = event.headers['stripe-signature'];
@@ -21,51 +60,45 @@ exports.handler = async (event) => {
     }
 
     try {
-        // Verify webhook signature
-        const body = event.body;
-        const hash = crypto
-            .createHmac('sha256', webhookSecret)
-            .update(body, 'utf8')
-            .digest('hex');
-
-        const computedSignature = `t=${Math.floor(Date.now() / 1000)},v1=${hash}`;
-
-        // Note: This is a simplified verification
-        // For production, use proper Stripe webhook verification
+        // Parse the webhook body
+        const stripeEvent = JSON.parse(event.body);
         
-        const stripeEvent = JSON.parse(body);
-
         console.log('📨 Webhook event:', stripeEvent.type);
 
         switch (stripeEvent.type) {
             case 'checkout.session.completed': {
                 const session = stripeEvent.data.object;
-                const { supabase_user_id, plan_type } = session.metadata;
+                const userId = session.metadata?.supabase_user_id;
+                const planType = session.metadata?.plan_type;
+                const customerId = session.customer;
 
-                console.log(`✅ Checkout completed for user ${supabase_user_id}, plan: ${plan_type}`);
-
-                // TODO: Update Supabase here
-                // For now, just log it
-                console.log('TODO: Update user subscription in Supabase');
-                console.log('User ID:', supabase_user_id);
-                console.log('Plan:', plan_type);
-                console.log('Stripe Customer ID:', session.customer);
-                console.log('Subscription ID:', session.subscription);
-
-                break;
-            }
-
-            case 'customer.subscription.updated': {
-                const subscription = stripeEvent.data.object;
-                console.log(`⚠️ Subscription updated for customer ${subscription.customer}`);
-                console.log('Status:', subscription.status);
+                if (userId && planType && session.payment_status === 'paid') {
+                    console.log(`✅ Checkout completed for user ${userId}, plan: ${planType}`);
+                    
+                    // Update Supabase to activate subscription
+                    const updated = await updateSupabaseSubscription(
+                        userId, 
+                        'active', 
+                        planType, 
+                        customerId
+                    );
+                    
+                    if (updated) {
+                        console.log(`🎉 Subscription activated for ${userId}`);
+                    }
+                } else {
+                    console.log('Missing metadata or payment not completed');
+                }
                 break;
             }
 
             case 'customer.subscription.deleted': {
                 const subscription = stripeEvent.data.object;
-                console.log(`🔴 Subscription deleted for customer ${subscription.customer}`);
-                // TODO: Downgrade user to basic plan in Supabase
+                const customerId = subscription.customer;
+                console.log(`🔴 Subscription deleted for customer ${customerId}`);
+                
+                // Find user by stripe_customer_id and deactivate
+                // This would require a lookup query first
                 break;
             }
 

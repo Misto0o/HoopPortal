@@ -71,7 +71,7 @@ exports.handler = async (event) => {
             // NOTE: Updating Supabase requires the module
             // The webhook will handle the DB update instead
             // This function just confirms payment status
-            
+
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },

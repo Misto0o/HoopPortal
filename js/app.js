@@ -108,19 +108,40 @@ class HoopPortalApp {
         const { data: { session }, error } = await supabaseClient.auth.getSession();
 
         if (session && session.user) {
-            // Check if there's a pending user type from Google signup
             const pendingUserType = localStorage.getItem('pending_user_type');
 
-            // Get existing user type from user_profiles
             let { data: userProfile } = await supabaseClient
                 .from('user_profiles')
-                .select('user_type')
+                .select('user_type, subscription_status, subscription_plan, free_trial_end_date')
                 .eq('id', session.user.id)
                 .maybeSingle();
 
-            // If no profile exists and we have a pending type, create the profile
             if (!userProfile && pendingUserType) {
-                // Create user profile with the pending type
+                // Check how many free trials have been used
+                const { count, error: countError } = await supabaseClient
+                    .from('user_profiles')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('used_free_trial', true);
+
+                const freeTrialsUsed = count || 0;
+                const FREE_TRIAL_LIMIT = 50;
+
+                let subscriptionStatus = 'inactive';
+                let usedFreeTrial = false;
+                let freeTrialEndDate = null;
+                let subscriptionPlan = null;
+
+                // Only give free trial to players (not coaches)
+                if (freeTrialsUsed < FREE_TRIAL_LIMIT && pendingUserType === 'player') {
+                    subscriptionStatus = 'active';
+                    usedFreeTrial = true;
+                    subscriptionPlan = 'basic';  // Give them BASIC plan features
+                    // Set expiration date to 30 days from now
+                    freeTrialEndDate = new Date();
+                    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 30);
+                    console.log(`✅ Free BASIC trial given to ${session.user.email}. Expires: ${freeTrialEndDate.toLocaleDateString()}`);
+                }
+
                 const { error: insertError } = await supabaseClient
                     .from('user_profiles')
                     .insert({
@@ -129,29 +150,47 @@ class HoopPortalApp {
                         user_type: pendingUserType,
                         first_name: session.user.user_metadata?.full_name?.split(' ')[0] || '',
                         last_name: session.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
-                        avatar_url: session.user.user_metadata?.avatar_url || null
+                        avatar_url: session.user.user_metadata?.avatar_url || null,
+                        subscription_status: subscriptionStatus,
+                        subscription_plan: subscriptionPlan,  // Assign 'basic'
+                        used_free_trial: usedFreeTrial,
+                        free_trial_end_date: freeTrialEndDate,
+                        subscription_date: usedFreeTrial ? new Date().toISOString() : null
                     });
 
                 if (!insertError) {
-                    // Create player or coach profile
                     if (pendingUserType === 'player') {
                         await supabaseClient
                             .from('player_profiles')
                             .insert({ id: session.user.id });
+
+                        if (usedFreeTrial) {
+                            const endDate = freeTrialEndDate.toLocaleDateString();
+                            this.showNotification(
+                                `🎉 Welcome! You've received a FREE 30-day BASIC plan trial! ` +
+                                `Your profile is visible to coaches until ${endDate}. ` +
+                                `Features: 2 highlight reels, visible in searches. ` +
+                                `Subscribe to keep it active or upgrade to PREMIUM!`,
+                                'success'
+                            );
+                        }
                     } else if (pendingUserType === 'coach') {
                         await supabaseClient
                             .from('coach_profiles')
                             .insert({ id: session.user.id });
                     }
 
-                    userProfile = { user_type: pendingUserType };
+                    userProfile = {
+                        user_type: pendingUserType,
+                        subscription_status: subscriptionStatus,
+                        subscription_plan: subscriptionPlan,
+                        free_trial_end_date: freeTrialEndDate
+                    };
                 }
 
-                // Clear the pending type
                 localStorage.removeItem('pending_user_type');
             }
 
-            // If still no profile, redirect to signup to choose type
             if (!userProfile) {
                 await supabaseClient.auth.signOut();
                 this.showNotification('Please sign up first to choose your account type', 'error');
@@ -163,6 +202,8 @@ class HoopPortalApp {
                 id: session.user.id,
                 email: session.user.email,
                 userType: userProfile.user_type,
+                subscriptionStatus: userProfile.subscription_status || 'inactive',
+                subscriptionPlan: userProfile.subscription_plan || null,
                 createdAt: new Date(),
                 avatar: session.user.user_metadata?.avatar_url || null
             };
@@ -177,17 +218,101 @@ class HoopPortalApp {
             }
 
             this.updateNavigation();
-
-            // Only redirect if on homepage
-            if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-                if (this.currentUser.userType === 'coach') {
-                    window.location.href = 'coach-dashboard.html';
-                } else {
-                    window.location.href = 'profile.html';
-                }
-            }
             return;
         }
+    }
+
+
+    async checkAndExpireFreeTrials() {
+        if (!this.currentUser) return;
+
+        try {
+            // Check if user has an active free trial that expired
+            const { data: user, error } = await supabaseClient
+                .from('user_profiles')
+                .select('used_free_trial, free_trial_end_date, subscription_status')
+                .eq('id', this.currentUser.id)
+                .single();
+
+            if (error) throw error;
+
+            // If they used a free trial and it has expired
+            if (user.used_free_trial && user.free_trial_end_date) {
+                const now = new Date();
+                const expiryDate = new Date(user.free_trial_end_date);
+
+                if (now > expiryDate && user.subscription_status === 'active') {
+                    // Expire the trial
+                    const { error: updateError } = await supabaseClient
+                        .from('user_profiles')
+                        .update({
+                            subscription_status: 'inactive'
+                        })
+                        .eq('id', this.currentUser.id);
+
+                    if (!updateError) {
+                        this.currentUser.subscriptionStatus = 'inactive';
+                        localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
+
+                        this.showNotification(
+                            'Your free 30-day trial has expired. Subscribe to continue being visible to coaches!',
+                            'warning'
+                        );
+
+                        this.updateVisibilityCard();
+                    }
+                } else if (user.subscription_status === 'active') {
+                    // Show days remaining
+                    const daysRemaining = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                    if (daysRemaining <= 7 && daysRemaining > 0) {
+                        console.log(`⚠️ Free trial expires in ${daysRemaining} days`);
+                        // Optional: Show a banner
+                        this.showTrialExpiringBanner(daysRemaining);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking free trial:', error);
+        }
+    }
+
+    showTrialExpiringBanner(daysRemaining) {
+        // Check if banner already exists
+        if (document.getElementById('trialExpiringBanner')) return;
+
+        const banner = document.createElement('div');
+        banner.id = 'trialExpiringBanner';
+        banner.style.cssText = `
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 1rem;
+        text-align: center;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        left: auto;
+        border-radius: 12px;
+        z-index: 9999;
+        max-width: 350px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        cursor: pointer;
+    `;
+        banner.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">⚠️</span>
+            <div>
+                <strong>Free Trial Ending Soon!</strong>
+                <div style="font-size: 0.85rem;">Your free trial expires in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Subscribe to stay visible to coaches.</div>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
+        </div>
+    `;
+        banner.onclick = (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                window.location.href = '/plans.html';
+            }
+        };
+        document.body.appendChild(banner);
     }
 
     showSignupModal() {
@@ -461,6 +586,7 @@ class HoopPortalApp {
                 this.showNotification('Account created successfully!', 'success');
                 this.closeModal(document.getElementById('authModal'));
                 this.updateNavigation();
+                await this.checkAndExpireFreeTrials();
 
                 setTimeout(() => {
                     if (userType === 'player') {
@@ -1284,22 +1410,36 @@ class HoopPortalApp {
 
         const subPlanEl = document.getElementById('subPlan');
         const manageBtn = document.getElementById('managePlanBtn');
+        const subStatus = document.getElementById('subStatus');
+
+        if (subStatus) {
+            if (this.currentUser.subscriptionStatus === 'active') {
+                subStatus.textContent = '✓ Active';
+                subStatus.style.color = '#10b981';
+            } else {
+                subStatus.textContent = '⚠️ Inactive - Not Visible';
+                subStatus.style.color = 'var(--primary-orange)';
+            }
+        }
 
         if (subPlanEl) {
-            const plan = this.currentUser.subscription || 'basic';
+            const plan = this.currentUser.subscriptionPlan || 'basic';
             subPlanEl.textContent = plan === 'premium' ? '⭐ Premium' : 'Basic';
         }
 
         if (manageBtn) {
-            if (this.currentUser.subscription === 'premium') {
-                manageBtn.textContent = 'Manage Plan';
+            if (this.currentUser.subscriptionStatus === 'active') {
+                manageBtn.textContent = 'Manage Subscription';
             } else {
-                manageBtn.textContent = 'Upgrade to Premium';
+                manageBtn.textContent = 'Upgrade to Get Visible';
             }
             manageBtn.addEventListener('click', () => {
                 window.location.href = 'plans.html';
             });
         }
+
+        // Update visibility card
+        updateVisibilityCard();
     }
 
     async uploadProfilePicture() {
@@ -1369,34 +1509,35 @@ class HoopPortalApp {
     // ============================================
     async loadSearchPlayers() {
         try {
-            // Load player profiles
             const { data: playerData, error: playerError } = await supabaseClient
                 .from('player_profiles')
                 .select('*');
 
             if (playerError) throw playerError;
 
-            // Load user profiles to get names and avatars
             const { data: userData, error: userError } = await supabaseClient
                 .from('user_profiles')
-                .select('id, first_name, last_name, avatar_url, gender');
+                .select('id, first_name, last_name, avatar_url, gender, subscription_status');
 
             if (userError) throw userError;
 
-            // Get like counts for all players
             const { data: likesData, error: likesError } = await supabaseClient
                 .from('liked_players')
                 .select('player_id');
 
             if (likesError) throw likesError;
 
-            // Count likes per player
+            const isCoach = this.currentUser?.userType === 'coach';
+
+            // DEBUG: Log what's happening
+            console.log('Current user type:', this.currentUser?.userType);
+            console.log('Is Coach?', isCoach);
+
             const likeCounts = {};
             likesData?.forEach(like => {
                 likeCounts[like.player_id] = (likeCounts[like.player_id] || 0) + 1;
             });
 
-            // Get current user's liked players (if logged in)
             let userLikes = [];
             if (this.currentUser) {
                 const { data: userLikesData } = await supabaseClient
@@ -1406,21 +1547,38 @@ class HoopPortalApp {
                 userLikes = userLikesData?.map(l => l.player_id) || [];
             }
 
-            // Create a map for quick lookup
             const userMap = {};
             userData.forEach(user => {
                 userMap[user.id] = {
                     firstName: user.first_name,
                     lastName: user.last_name,
                     avatar: user.avatar_url,
-                    gender: user.gender
+                    gender: user.gender,
+                    subscriptionStatus: user.subscription_status || 'inactive'
                 };
             });
 
-            // Combine data
+            // DEBUG: Log subscription statuses
+            console.log('User subscription data:', userData.map(u => ({
+                id: u.id,
+                name: u.first_name,
+                subscription_status: u.subscription_status
+            })));
+
             this.realPlayers = playerData.map(player => {
                 const userInfo = userMap[player.id] || {};
                 const fullName = `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim();
+
+                // IMPORTANT: For coaches, ONLY show active players
+                let visible = true;
+                if (isCoach) {
+                    visible = userInfo.subscriptionStatus === 'active';
+                }
+
+                // DEBUG: Log each player's visibility
+                if (isCoach) {
+                    console.log(`Player: ${fullName}, Subscription: ${userInfo.subscriptionStatus}, Visible: ${visible}`);
+                }
 
                 return {
                     id: player.id,
@@ -1440,16 +1598,21 @@ class HoopPortalApp {
                     liked: userLikes.includes(player.id),
                     description: player.game_description || '',
                     coachType: player.coach_preferences || '',
-                    realProfile: true
+                    realProfile: true,
+                    visible: visible,
+                    subscriptionStatus: userInfo.subscriptionStatus  // Store for debugging
                 };
             });
 
+            console.log('Total players loaded:', this.realPlayers.length);
+            console.log('Visible players for coach:', this.realPlayers.filter(p => p.visible).length);
             console.log('REAL PLAYERS:', this.realPlayers);
 
         } catch (err) {
             console.error('Load search players error:', err);
         }
     }
+
     updateQuickProfile() {
         const position = document.getElementById('position')?.value;
         const height = document.getElementById('height')?.value;
@@ -1675,10 +1838,15 @@ class HoopPortalApp {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         if (event && event.target) event.target.classList.add('active');
 
-        // Filter real players
+        // Filter real players by gender first
         let filtered = gender === 'all'
             ? [...this.realPlayers]
             : [...this.realPlayers].filter(p => p.gender === gender);
+
+        // For coaches, only show visible players
+        if (this.currentUser?.userType === 'coach') {
+            filtered = filtered.filter(p => p.visible === true);
+        }
 
         filtered = filtered.slice(0, 20);
         this.displayProspectsHome(filtered);
@@ -1688,42 +1856,59 @@ class HoopPortalApp {
         const container = document.getElementById('homeProspectsContainer');
         if (!container) return;
 
-        if (prospects.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No players found</p>';
+        // Filter out invisible players for coaches
+        let visibleProspects = prospects;
+        if (this.currentUser?.userType === 'coach') {
+            visibleProspects = prospects.filter(p => p.visible === true);
+        }
+
+        if (visibleProspects.length === 0) {
+            if (this.currentUser?.userType === 'coach') {
+                container.innerHTML = `
+                <div style="text-align: center; padding: 3rem; background: var(--secondary-dark); border-radius: 12px; grid-column: 1/-1;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">👥</div>
+                    <h3>No Active Players Found</h3>
+                    <p style="color: var(--text-muted);">Players must have an active subscription to be visible to coaches.</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Check back later as more players subscribe!</p>
+                </div>
+            `;
+            } else {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No players found</p>';
+            }
             return;
         }
 
-        container.innerHTML = prospects.map(p => {
+        container.innerHTML = visibleProspects.map(p => {
             const avatarContent = p.avatar
                 ? `<img src="${p.avatar}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
                 : p.emoji;
 
             return `
-                <div class="prospect-card-home ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal('${p.id}')">
-                    <div class="prospect-avatar">${avatarContent}</div>
-                    <div class="prospect-card-content">
-                        <h3>${p.name}</h3>
-                        <div class="prospect-stats">
-                            <div class="stat-item">
-                                <div class="stat-label">Position</div>
-                                <div class="stat-value">${p.position}</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">Class</div>
-                                <div class="stat-value">${p.classYear}</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">Height</div>
-                                <div class="stat-value">${p.height}</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">Location</div>
-                                <div class="stat-value">${p.city}, ${p.state}</div>
-                            </div>
+            <div class="prospect-card-home ${p.premium ? 'premium' : ''}" onclick="app.showPlayerModal('${p.id}')">
+                <div class="prospect-avatar">${avatarContent}</div>
+                <div class="prospect-card-content">
+                    <h3>${p.name}</h3>
+                    <div class="prospect-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">Position</div>
+                            <div class="stat-value">${p.position}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Class</div>
+                            <div class="stat-value">${p.classYear}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Height</div>
+                            <div class="stat-value">${p.height}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Location</div>
+                            <div class="stat-value">${p.city}, ${p.state}</div>
                         </div>
                     </div>
                 </div>
-            `;
+            </div>
+        `;
         }).join('');
     }
 
@@ -1738,6 +1923,8 @@ class HoopPortalApp {
         const allPlayers = [...this.realPlayers];
 
         let results = allPlayers.filter(p => {
+            // Filter by visibility first
+            if (!p.visible) return false;
             if (name && !p.name?.toLowerCase().includes(name.toLowerCase())) return false;
             if (city && !p.city?.toLowerCase().includes(city.toLowerCase())) return false;
             if (state && p.state !== state) return false;
@@ -1749,6 +1936,14 @@ class HoopPortalApp {
 
         results.sort((a, b) => b.premium - a.premium);
         this.displaySearchResults(results);
+
+        // Show message if no results
+        if (results.length === 0 && this.currentUser?.userType === 'coach') {
+            const container = document.getElementById('searchProspectsContainer');
+            if (container) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No active players found. Players must have an active subscription to be visible.</p>';
+            }
+        }
     }
 
     displaySearchResults(prospects) {
@@ -1812,6 +2007,49 @@ class HoopPortalApp {
         if (document.getElementById('filterGender')) document.getElementById('filterGender').value = '';
         const container = document.getElementById('searchProspectsContainer');
         if (container) container.innerHTML = '';
+    }
+
+    updateVisibilityCard() {
+        const user = this.currentUser;
+        if (!user || user.userType !== 'player') return;
+
+        const card = document.getElementById('visibilityCard');
+        const status = document.getElementById('visibilityStatus');
+        const icon = document.getElementById('visibilityIcon');
+        const desc = document.getElementById('visibilityDescription');
+        const btn = document.getElementById('getVisibilityBtn');
+        const statusDisplay = document.getElementById('subStatus');
+
+        if (card && user.subscriptionStatus === 'active') {
+            card.classList.add('active');
+            card.classList.remove('inactive');
+            if (status) {
+                status.textContent = 'ACTIVE ✓';
+                status.classList.add('active');
+                status.classList.remove('inactive');
+            }
+            if (icon) icon.textContent = '👁️✓';
+            if (desc) desc.textContent = 'Coaches can see your profile! Keep your information updated to attract more recruits.';
+            if (btn) {
+                btn.textContent = 'Manage Subscription';
+                btn.className = 'cta-button secondary';
+            }
+            if (statusDisplay) statusDisplay.textContent = '✓ Active';
+        } else if (card) {
+            card.classList.remove('active');
+            if (status) {
+                status.textContent = 'INACTIVE';
+                status.classList.add('inactive');
+                status.classList.remove('active');
+            }
+            if (icon) icon.textContent = '👁️❌';
+            if (desc) desc.textContent = 'Your profile is currently not visible to coaches. Purchase a subscription to appear in coach search results.';
+            if (btn) {
+                btn.textContent = 'Get Visible - Buy Subscription';
+                btn.className = 'cta-button primary';
+            }
+            if (statusDisplay) statusDisplay.textContent = '⚠️ Inactive - Not Visible';
+        }
     }
 
     async showPlayerModal(playerId) {
@@ -2568,10 +2806,10 @@ class HoopPortalApp {
             return;
         }
 
-        // Price IDs
+        // Price IDs - Replace with your actual Stripe Price IDs
         const priceIds = {
-            basic: 'price_1TZHdpPv1yKOz6gv9mvr8OPS',
-            premium: 'price_1TZHeNPv1yKOz6gvZ7hotmwm'
+            basic: 'price_1TZHdpPv1yKOz6gv9mvr8OPS',    // Replace with your Basic plan price ID
+            premium: 'price_1TZHeNPv1yKOz6gvZ7hotmwm'   // Replace with your Premium plan price ID
         };
 
         const priceId = priceIds[plan];
@@ -2583,7 +2821,6 @@ class HoopPortalApp {
         this.showNotification('Redirecting to checkout...', 'success');
 
         try {
-            // Call Netlify function to create checkout session
             const response = await fetch('/.netlify/functions/create-checkout', {
                 method: 'POST',
                 headers: {
@@ -2610,7 +2847,6 @@ class HoopPortalApp {
                 throw new Error('No checkout URL returned');
             }
 
-            // Redirect to Stripe checkout
             window.location.href = data.url;
 
         } catch (error) {
@@ -2623,13 +2859,11 @@ class HoopPortalApp {
     }
 
     async handleCheckoutSuccess() {
-        // Called when user returns from Stripe checkout
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get('session_id');
 
         if (sessionId && this.currentUser) {
             try {
-                // Verify session on backend (optional but recommended)
                 const response = await fetch('/.netlify/functions/verify-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2637,24 +2871,23 @@ class HoopPortalApp {
                 });
 
                 if (response.ok) {
-                    // Reload user data to get updated subscription
+                    // Refresh user data from Supabase
                     const { data: userProfile } = await supabaseClient
                         .from('user_profiles')
-                        .select('subscription, subscription_status')
+                        .select('subscription_status, subscription_plan')
                         .eq('id', this.currentUser.id)
                         .single();
 
-                    if (userProfile) {
-                        this.currentUser.subscription = userProfile.subscription;
+                    if (userProfile && userProfile.subscription_status === 'active') {
+                        this.currentUser.subscriptionStatus = userProfile.subscription_status;
+                        this.currentUser.subscriptionPlan = userProfile.subscription_plan;
                         localStorage.setItem('hoopportal_user', JSON.stringify(this.currentUser));
 
+                        this.updateVisibilityCard();
                         this.showNotification(
-                            `Welcome to ${userProfile.subscription === 'premium' ? 'Premium' : 'Basic'}! 🎉`,
+                            `Welcome to ${userProfile.subscription_plan === 'premium' ? 'Premium' : 'Basic'}! 🎉 Your profile is now visible to coaches!`,
                             'success'
                         );
-
-                        // Update UI
-                        this.loadSubscriptionStatus();
                     }
                 }
             } catch (error) {
@@ -2665,8 +2898,6 @@ class HoopPortalApp {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
-
-
 
     closeModal(modal) {
         modal.classList.remove('show');
@@ -2722,8 +2953,12 @@ class HoopPortalApp {
     }
 
     // Update loadPageContent to handle coach dashboard
-    loadPageContent() {
+    async loadPageContent() {
         const path = window.location.pathname.split('/').pop() || 'index.html';
+
+        if (this.currentUser) {
+            await this.checkAndExpireFreeTrials();
+        }
 
         if (path.includes('coach-dashboard.html')) {
             if (this.currentUser?.userType === 'coach') {

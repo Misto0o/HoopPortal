@@ -9,6 +9,98 @@
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/profile.css">
     <link rel="stylesheet" href="/extras/navbar.css">
+    <style>
+        .subscription-visibility-card {
+            background: linear-gradient(135deg, #1a1d22 0%, #0f1114 100%);
+            border: 2px solid var(--primary-orange);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .subscription-visibility-card.active {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #064e3b 0%, #042f2e 100%);
+        }
+
+        .visibility-status {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin: 1rem 0;
+            letter-spacing: -0.5px;
+        }
+
+        .visibility-status.active {
+            color: #10b981;
+        }
+
+        .visibility-status.inactive {
+            color: var(--primary-orange);
+        }
+
+        .visibility-description {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin: 1rem 0 1.5rem 0;
+            line-height: 1.5;
+        }
+
+        .cta-button {
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .cta-button.primary {
+            background: linear-gradient(135deg, var(--primary-orange) 0%, #d97706 100%);
+            color: white;
+        }
+
+        .cta-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(249, 115, 22, 0.3);
+        }
+
+        .cta-button.secondary {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .cta-button.secondary:hover {
+            border-color: var(--primary-orange);
+            color: var(--primary-orange);
+        }
+
+        .visibility-icon {
+            font-size: 3rem;
+            margin: 1rem 0;
+        }
+
+        .benefits-list {
+            text-align: left;
+            display: inline-block;
+            margin: 1.5rem 0;
+        }
+
+        .benefits-list li {
+            padding: 0.5rem 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .benefits-list li::before {
+            content: '✓ ';
+            color: #10b981;
+            font-weight: 700;
+            margin-right: 0.5rem;
+        }
+    </style>
 </head>
 
 <body>
@@ -31,13 +123,33 @@
             <div class="profile-wrapper">
                 <!-- LEFT: FORMS -->
                 <div class="profile-forms">
+                    <!-- SUBSCRIPTION VISIBILITY STATUS CARD -->
+                    <div class="subscription-visibility-card" id="visibilityCard">
+                        <div class="visibility-icon" id="visibilityIcon">👁️</div>
+                        <div class="visibility-status inactive" id="visibilityStatus">INACTIVE</div>
+                        <p class="visibility-description" id="visibilityDescription">
+                            Your profile is currently not visible to coaches. Purchase a subscription to appear in coach
+                            search results.
+                        </p>
+                        <ul class="benefits-list">
+                            <li>Coaches can find your profile</li>
+                            <li>Coaches can see your contact info</li>
+                            <li>Coaches can reach out to recruit you</li>
+                        </ul>
+                        <button class="cta-button primary" id="getVisibilityBtn"
+                            onclick="window.location.href='plans.html'">
+                            Get Visible - Buy Subscription
+                        </button>
+                    </div>
+
                     <!-- Profile Picture Card -->
                     <div class="profile-card pfp-card">
                         <h2>Profile Picture</h2>
                         <div id="profilePicture" class="profile-picture-display"
                             style="overflow: hidden; display: flex; align-items: center; justify-content: center;">
                             <span id="pfpPlaceholder">🏀</span>
-                        </div> <button class="btn btn-secondary" id="uploadPFPBtn">Upload Photo</button>
+                        </div>
+                        <button class="btn btn-secondary" id="uploadPFPBtn">Upload Photo</button>
                         <p class="pfp-hint">Choose a photo or use your emoji. Photos must be under 5MB.</p>
                     </div>
 
@@ -105,13 +217,6 @@
                                         <option value="2034">Class of 2034</option>
                                         <option value="2035">Class of 2035</option>
                                     </select>
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Upload Transcript</label>
-                                    <input type="file" id="transcript" accept=".pdf,.doc,.docx">
                                 </div>
                             </div>
 
@@ -372,36 +477,80 @@
 
                         <!-- Subscription Card -->
                         <div class="stats-card subscription-card">
-                            <h3>Subscription</h3>
+                            <h3>Profile Visibility</h3>
                             <div class="subscription-status">
                                 <div class="status-item">
-                                    <span class="status-label">Plan</span>
-                                    <span class="status-value" id="subPlan">Loading...</span>
-                                </div>
-                                <div class="status-item">
                                     <span class="status-label">Status</span>
-                                    <span class="status-value" id="subStatus">Active</span>
+                                    <span class="status-value" id="subStatus">Loading...</span>
                                 </div>
                             </div>
-                            <button class="btn btn-primary btn-small" id="managePlanBtn">Upgrade to Premium</button>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 1rem 0;">
+                                Only coaches with paid subscriptions can see your profile. You need an active
+                                subscription to be discoverable.
+                            </p>
+                            <button class="btn btn-primary btn-small" id="managePlanBtn">Upgrade to Get Visible</button>
                         </div>
 
                         <!-- Boost Recruitment Card -->
                         <div class="stats-card boost-card">
-                            <h3>Boost Your Recruitment</h3>
+                            <h3>Get Noticed by Coaches</h3>
                             <ul class="boost-list">
                                 <li>Upload 3 highlight reels for maximum impact.</li>
                                 <li>Keep stats updated after every game.</li>
-                                <li>Premium profiles get 4x more views.</li>
+                                <li>Buy a subscription to appear in coach searches.</li>
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
     </section>
+
     <script src="/extras/navbar.js"></script>
     <script src="/js/app.js"></script>
     <script src="https://js.stripe.com/v3/"></script>
+
+    <script>
+        // Update visibility card based on subscription status
+        // Update visibility card based on subscription status
+        function updateVisibilityCard() {
+            const userStr = localStorage.getItem('hoopportal_user');
+            if (!userStr) return;
+
+            const user = JSON.parse(userStr);
+            const card = document.getElementById('visibilityCard');
+            const status = document.getElementById('visibilityStatus');
+            const icon = document.getElementById('visibilityIcon');
+            const desc = document.getElementById('visibilityDescription');
+            const btn = document.getElementById('getVisibilityBtn');
+            const statusDisplay = document.getElementById('subStatus');
+
+            if (user.subscriptionStatus === 'active') {
+                card.classList.add('active');
+                card.classList.remove('inactive');
+                status.textContent = 'ACTIVE ✓';
+                status.classList.add('active');
+                status.classList.remove('inactive');
+                icon.textContent = '👁️✓';
+                desc.textContent = 'Coaches can see your profile! Keep your information updated to attract more recruits.';
+                btn.textContent = 'Manage Subscription';
+                btn.className = 'cta-button secondary';
+                if (statusDisplay) statusDisplay.textContent = '✓ Active';
+            } else {
+                card.classList.remove('active');
+                status.textContent = 'INACTIVE';
+                status.classList.add('inactive');
+                status.classList.remove('active');
+                icon.textContent = '👁️❌';
+                desc.textContent = 'Your profile is currently not visible to coaches. Purchase a subscription to appear in coach search results.';
+                btn.textContent = 'Get Visible - Buy Subscription';
+                btn.className = 'cta-button primary';
+                if (statusDisplay) statusDisplay.textContent = '⚠️ Inactive - Not Visible';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', updateVisibilityCard);
+        window.addEventListener('focus', updateVisibilityCard);
+    </script>
 </body>
 
 </html>
