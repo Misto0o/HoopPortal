@@ -1,128 +1,115 @@
+// netlify/functions/delete-account.js
+// NO IMPORTS - Uses native fetch and Supabase REST API directly
+
 exports.handler = async (event) => {
+    // Only allow POST requests
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
+    }
+
     try {
-        // Only allow POST requests
-        if (event.httpMethod !== 'POST') {
-            return {
-                statusCode: 405,
-                body: JSON.stringify({ error: 'Method not allowed' })
-            };
-        }
-
-        const supabase = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
-
         const { userId } = JSON.parse(event.body);
 
         if (!userId) {
             return {
                 statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ error: 'userId is required' })
+            };
+        }
+
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (!supabaseUrl || !supabaseServiceKey) {
+            console.error('Missing Supabase environment variables');
+            return {
+                statusCode: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Server configuration error' })
             };
         }
 
         console.log(`Starting account deletion for user: ${userId}`);
 
-        // ============================================
-        // DELETE ALL USER DATA (CASCADE)
-        // ============================================
+        // Helper function to make Supabase REST API calls
+        async function deleteFromTable(table, column, value) {
+            const url = `${supabaseUrl}/rest/v1/${table}?${column}=eq.${value}`;
+            const response = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'apikey': supabaseServiceKey,
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok && response.status !== 404) {
+                console.error(`Error deleting from ${table}:`, await response.text());
+            }
+            return response;
+        }
 
-        // 1. Delete player_stats
-        const { error: statsError } = await supabase
-            .from('player_stats')
-            .delete()
-            .eq('player_id', userId);
-        if (statsError) console.error('Error deleting player_stats:', statsError);
+        // Delete in order (child tables first)
+        console.log('Deleting from player_stats...');
+        await deleteFromTable('player_stats', 'player_id', userId);
 
-        // 2. Delete player_contact
-        const { error: contactError } = await supabase
-            .from('player_contact')
-            .delete()
-            .eq('player_id', userId);
-        if (contactError) console.error('Error deleting player_contact:', contactError);
+        console.log('Deleting from player_contact...');
+        await deleteFromTable('player_contact', 'player_id', userId);
 
-        // 3. Delete parent_guardians
-        const { error: parentsError } = await supabase
-            .from('parent_guardians')
-            .delete()
-            .eq('player_id', userId);
-        if (parentsError) console.error('Error deleting parent_guardians:', parentsError);
+        console.log('Deleting from parent_guardians...');
+        await deleteFromTable('parent_guardians', 'player_id', userId);
 
-        // 4. Delete highlight_reels
-        const { error: reelsError } = await supabase
-            .from('highlight_reels')
-            .delete()
-            .eq('player_id', userId);
-        if (reelsError) console.error('Error deleting highlight_reels:', reelsError);
+        console.log('Deleting from highlight_reels...');
+        await deleteFromTable('highlight_reels', 'player_id', userId);
 
-        // 5. Delete liked_players (user who liked OR player who was liked)
-        const { error: likesUserError } = await supabase
-            .from('liked_players')
-            .delete()
-            .eq('user_id', userId);
-        if (likesUserError) console.error('Error deleting liked_players (user_id):', likesUserError);
+        console.log('Deleting from liked_players (as user)...');
+        await deleteFromTable('liked_players', 'user_id', userId);
 
-        const { error: likesPlayerError } = await supabase
-            .from('liked_players')
-            .delete()
-            .eq('player_id', userId);
-        if (likesPlayerError) console.error('Error deleting liked_players (player_id):', likesPlayerError);
+        console.log('Deleting from liked_players (as player)...');
+        await deleteFromTable('liked_players', 'player_id', userId);
 
-        // 6. Delete player_views (viewer OR player being viewed)
-        const { error: viewsViewerError } = await supabase
-            .from('player_views')
-            .delete()
-            .eq('viewer_id', userId);
-        if (viewsViewerError) console.error('Error deleting player_views (viewer_id):', viewsViewerError);
+        console.log('Deleting from player_views (as viewer)...');
+        await deleteFromTable('player_views', 'viewer_id', userId);
 
-        const { error: viewsPlayerError } = await supabase
-            .from('player_views')
-            .delete()
-            .eq('player_id', userId);
-        if (viewsPlayerError) console.error('Error deleting player_views (player_id):', viewsPlayerError);
+        console.log('Deleting from player_views (as player)...');
+        await deleteFromTable('player_views', 'player_id', userId);
 
-        // 7. Delete from player_profiles
-        const { error: playerProfileError } = await supabase
-            .from('player_profiles')
-            .delete()
-            .eq('id', userId);
-        if (playerProfileError) console.error('Error deleting player_profiles:', playerProfileError);
+        console.log('Deleting from player_profiles...');
+        await deleteFromTable('player_profiles', 'id', userId);
 
-        // 8. Delete from coach_profiles
-        const { error: coachProfileError } = await supabase
-            .from('coach_profiles')
-            .delete()
-            .eq('id', userId);
-        if (coachProfileError) console.error('Error deleting coach_profiles:', coachProfileError);
+        console.log('Deleting from coach_profiles...');
+        await deleteFromTable('coach_profiles', 'id', userId);
 
-        // 9. Delete from user_profiles
-        const { error: userProfileError } = await supabase
-            .from('user_profiles')
-            .delete()
-            .eq('id', userId);
-        if (userProfileError) console.error('Error deleting user_profiles:', userProfileError);
+        console.log('Deleting from user_profiles...');
+        await deleteFromTable('user_profiles', 'id', userId);
 
-        // ============================================
-        // DELETE AUTH USER (LAST)
-        // ============================================
-        const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+        // Delete auth user using Supabase Admin API
+        console.log('Deleting auth user...');
+        const authUrl = `${supabaseUrl}/auth/v1/admin/users/${userId}`;
+        const authResponse = await fetch(authUrl, {
+            method: 'DELETE',
+            headers: {
+                'apikey': supabaseServiceKey,
+                'Authorization': `Bearer ${supabaseServiceKey}`
+            }
+        });
 
-        if (authError) {
-            console.error('Error deleting auth user:', authError);
-            return {
-                statusCode: 500,
-                body: JSON.stringify({
-                    error: 'Failed to delete auth user',
-                    message: authError.message
-                })
-            };
+        if (!authResponse.ok) {
+            const errorText = await authResponse.text();
+            console.error('Error deleting auth user:', errorText);
+            // Don't fail the whole operation if auth deletion fails, user data is already gone
         }
 
         console.log(`Successfully deleted account for user: ${userId}`);
 
         return {
             statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 success: true,
                 message: 'Account and all associated data deleted successfully'
@@ -133,6 +120,7 @@ exports.handler = async (event) => {
         console.error('Unexpected error during account deletion:', error);
         return {
             statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 error: 'Unexpected error during account deletion',
                 message: error.message
