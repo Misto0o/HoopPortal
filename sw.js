@@ -1,7 +1,7 @@
 // sw.js - Place this in your root directory
 // Service Worker for HoopPortal Cache Management
 
-const CACHE_VERSION = 'v5.0';
+const CACHE_VERSION = 'v6.0';
 const CACHE_NAME = `hoopportal-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `hoopportal-dynamic-${CACHE_VERSION}`;
 

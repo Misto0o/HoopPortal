@@ -7,31 +7,33 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 
 async function initializeSupabase() {
-    // Check if supabase is already loaded
     if (supabaseClient) return supabaseClient;
 
-    // Wait for the Supabase script to load if needed
-    if (!window.supabase) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-        await new Promise((resolve, reject) => {
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
+    // Wait for supabase to be available (max 5 seconds)
+    let attempts = 0;
+    while (!window.supabase && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
     }
 
-    // Create the client
+    if (!window.supabase) {
+        console.error('[Supabase] Library failed to load');
+        throw new Error('Supabase library failed to load');
+    }
+
+    // Create the client with proper options
     const { createClient } = window.supabase;
-    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+        }
+    });
 
-    // Small delay to ensure client is ready
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    console.log('[Supabase] Client initialized successfully');
+    console.log('[Supabase] Client initialized successfully with version 2.106.1');
     return supabaseClient;
 }
-
 (function () {
     // Check if service worker is supported
     if ('serviceWorker' in navigator) {
