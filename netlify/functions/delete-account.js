@@ -1,5 +1,3 @@
-const { createClient } = require('@supabase/supabase-js');
-
 exports.handler = async (event) => {
     try {
         // Only allow POST requests
