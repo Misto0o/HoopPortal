@@ -4,11 +4,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - HoopPortal</title>
+    <title>HoopPortal | Player Profile - Basketball Recruiting</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/profile.css">
     <link rel="stylesheet" href="/extras/navbar.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description"
+        content="Complete basketball player profile with stats, highlights, and contact information. Get discovered by college coaches and recruiters.">
+
+    <meta property="og:title" content="Basketball Player Profile - HoopPortal">
+    <meta property="og:description"
+        content="Real stats, real highlights, real potential. Connect with coaches actively recruiting players.">
+    <meta property="og:url" content="https://hoopportal.com/profile.html">
+    <meta property="og:type" content="profile">
+    <meta property="og:image" content="https://hoopportal.com/images/og-profile.jpg">
+
+    <meta name="twitter:title" content="Basketball Player Profile">
+    <meta name="twitter:description" content="Showcase your talent to college coaches nationwide.">
+
+    <meta name="author" content="Kristian Cook">
+    <meta name="robots" content="noindex, follow">
+
+    <link rel="canonical" href="https://hoopportal.com/profile.html">
+    <link rel="icon" type="image/x-icon" href="HoopPortalcons/favicon.ico">
+    <link rel="stylesheet" href="/extras/footer.css">
+    <script src="/extras/footer.js"></script>
+    <link rel="manifest" href="/manifest.json">
     <style>
         .subscription-visibility-card {
             background: linear-gradient(135deg, #1a1d22 0%, #0f1114 100%);
@@ -477,7 +501,7 @@
 
                         <!-- Subscription Card -->
                         <div class="stats-card subscription-card">
-                            <h3>Profile Visibility</h3>
+                            <h3>Account Settings</h3>
                             <div class="subscription-status">
                                 <div class="status-item">
                                     <span class="status-label">Status</span>
@@ -485,10 +509,12 @@
                                 </div>
                             </div>
                             <p style="color: var(--text-muted); font-size: 0.85rem; margin: 1rem 0;">
-                                Only coaches with paid subscriptions can see your profile. You need an active
-                                subscription to be discoverable.
+                                Manage your subscription, billing, and account preferences.
                             </p>
-                            <button class="btn btn-primary btn-small" id="managePlanBtn">Upgrade to Get Visible</button>
+                            <button class="btn btn-primary btn-small" id="managePlanBtn"
+                                onclick="window.location.href='subscription.html'">
+                                Manage Account
+                            </button>
                         </div>
 
                         <!-- Boost Recruitment Card -->

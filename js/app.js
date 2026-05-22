@@ -17,7 +17,60 @@ async function initializeSupabase() {
     }
     const { createClient } = window.supabase;
     supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // EXPOSE GLOBALLY FOR OTHER PAGES
+    window.supabaseClient = supabaseClient;
 }
+(function () {
+    // Check if service worker is supported
+    if ('serviceWorker' in navigator) {
+        // Wait for page to load
+        window.addEventListener('load', function () {
+            // Register service worker
+            navigator.serviceWorker.register('/sw.js', {
+                scope: '/',
+                updateViaCache: 'none' // Important: prevent SW script from being cached
+            })
+                .then(function (registration) {
+                    console.log('✅ ServiceWorker registered successfully:', registration.scope);
+
+                    // Check for updates every hour
+                    setInterval(function () {
+                        registration.update();
+                        console.log('🔍 Checking for service worker updates');
+                    }, 60 * 60 * 1000);
+
+                    // Handle controller change (new SW takes over)
+                    navigator.serviceWorker.addEventListener('controllerchange', function () {
+                        console.log('🔄 Service worker controller changed, refreshing page');
+                        window.location.reload();
+                    });
+
+                    // Listen for messages from service worker
+                    navigator.serviceWorker.addEventListener('message', function (event) {
+                        if (event.data && event.data.type === 'FORCE_REFRESH') {
+                            console.log('📢 Force refresh requested by SW');
+                            window.location.reload();
+                        }
+                    });
+
+                })
+                .catch(function (error) {
+                    console.error('❌ ServiceWorker registration failed:', error);
+                });
+        });
+    } else {
+        console.warn('⚠️ Service Worker not supported in this browser');
+    }
+})();
+
+
+// Also add beforeunload handler to clear sensitive data
+window.addEventListener('beforeunload', () => {
+    if (!localStorage.getItem('hoopportal_user')) {
+        sessionStorage.clear();
+    }
+});
+
 
 // ============================================
 // MAIN APP CLASS
@@ -1428,20 +1481,17 @@ class HoopPortalApp {
         }
 
         if (manageBtn) {
-            if (this.currentUser.subscriptionStatus === 'active') {
-                manageBtn.textContent = 'Manage Subscription';
-            } else {
-                manageBtn.textContent = 'Upgrade to Get Visible';
-            }
-            manageBtn.addEventListener('click', () => {
-                window.location.href = 'plans.html';
-            });
+            manageBtn.textContent = 'Manage Account';
+            manageBtn.onclick = () => {
+                window.location.href = 'subscription.html';
+            };
         }
 
         // Update visibility card
-        updateVisibilityCard();
+        if (typeof updateVisibilityCard === 'function') {
+            updateVisibilityCard();
+        }
     }
-
     async uploadProfilePicture() {
         if (!this.currentUser) {
             this.showNotification('Please log in first', 'error');
@@ -2132,137 +2182,167 @@ class HoopPortalApp {
                     console.error('Load player details error:', err);
                 }
             }
+        }
 
-            let profilePic = player.avatar || player.emoji || '🏀';
-            const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
+        let profilePic = player.avatar || player.emoji || '🏀';
+        const likeButtonStyle = player.liked ? 'background-color: var(--primary-orange); color: white;' : '';
+        const isLoggedIn = !!this.currentUser;
 
-            // Generate highlight reels HTML
-            let highlightReelsHtml = '';
-            if (playerHighlightReels.length > 0) {
-                highlightReelsHtml = `
-            <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-                <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">🎥 Highlight Reels</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    ${playerHighlightReels.map(reel => {
-                    const embedUrl = this.getYouTubeEmbedUrl(reel.url);
-                    const title = reel.title || 'Watch Highlight';
-                    if (embedUrl) {
-                        const videoId = embedUrl.match(/embed\/([^?]+)/)?.[1];
-                        return `
-                                <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
-                                    <div style="background: #1e2025; border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
-                                        <div style="position: relative; background: #000;">
-                                            <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" 
-                                                 style="width: 100%; height: 120px; object-fit: cover; opacity: 0.8;">
-                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                                                        font-size: 32px; color: white; text-shadow: 2px 2px 4px black;">▶️</div>
-                                        </div>
-                                        <div style="padding: 0.75rem; text-align: center;">
-                                            <div style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(title)}</div>
-                                        </div>
+        // Generate highlight reels HTML
+        let highlightReelsHtml = '';
+        if (playerHighlightReels.length > 0) {
+            highlightReelsHtml = `
+        <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">🎥 Highlight Reels</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                ${playerHighlightReels.map(reel => {
+                const embedUrl = this.getYouTubeEmbedUrl(reel.url);
+                const title = reel.title || 'Watch Highlight';
+                if (embedUrl) {
+                    const videoId = embedUrl.match(/embed\/([^?]+)/)?.[1];
+                    return `
+                            <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                                <div style="background: #1e2025; border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
+                                    <div style="position: relative; background: #000;">
+                                        <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" 
+                                             style="width: 100%; height: 120px; object-fit: cover; opacity: 0.8;">
+                                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                                    font-size: 32px; color: white; text-shadow: 2px 2px 4px black;">▶️</div>
                                     </div>
-                                </a>
-                            `;
-                    } else {
-                        return `
-                                <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
-                                    <div style="background: #1e2025; border-radius: 12px; padding: 1rem; text-align: center;">
-                                        <div style="font-size: 2rem;">🎬</div>
-                                        <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;">${this.escapeHtml(title)}</div>
+                                    <div style="padding: 0.75rem; text-align: center;">
+                                        <div style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(title)}</div>
                                     </div>
-                                </a>
-                            `;
-                    }
-                }).join('')}
-                </div>
-            </div>
-        `;
-            }
-
-            // Generate contact info HTML (only show if authenticated user is viewing)
-            let contactHtml = '';
-            if (this.currentUser) {
-                contactHtml = `
-            <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-                <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">📞 Contact Information</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    ${contactInfo.playerEmail ? `
-                        <div>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">Player Email</div>
-                            <div style="font-weight: 600;">${contactInfo.playerEmail}</div>
-                        </div>
-                    ` : ''}
-                    ${contactInfo.playerPhone ? `
-                        <div>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">Player Phone</div>
-                            <div style="font-weight: 600;">${contactInfo.playerPhone}</div>
-                        </div>
-                    ` : ''}
-                    ${contactInfo.parentName ? `
-                        <div style="grid-column: span 2; margin-top: 0.5rem;">
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">Parent/Guardian</div>
-                            <div style="font-weight: 600;">${this.escapeHtml(contactInfo.parentName)}</div>
-                            ${contactInfo.parentEmail ? `<div style="font-size: 0.85rem;">${contactInfo.parentEmail}</div>` : ''}
-                            ${contactInfo.parentPhone ? `<div style="font-size: 0.85rem;">${contactInfo.parentPhone}</div>` : ''}
-                        </div>
-                    ` : ''}
-                </div>
-                ${!contactInfo.playerEmail && !contactInfo.playerPhone && !contactInfo.parentName ? '<div style="color: var(--text-muted); text-align: center;">No contact information provided</div>' : ''}
-            </div>
-        `;
-            }
-
-            const modalBody = document.getElementById('playerModalBody');
-            modalBody.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
-            <div>
-                <div style="text-align: center; margin-bottom: 1.5rem;">
-                    ${profilePic.startsWith('http') ? `<img src="${profilePic}" alt="${player.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : `<div style="font-size: 3rem; margin-bottom: 1rem;">${profilePic}</div>`}
-                    <h2 style="margin-bottom: 0.25rem;">${player.name}</h2>
-                    ${player.premium ? '<p style="color: var(--primary-orange); font-weight: 700; margin-bottom: 0.5rem;">⭐ PREMIUM PLAYER</p>' : ''}
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Position</p><p style="font-weight: 700;">${player.position || '—'}</p></div>
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Height</p><p style="font-weight: 700;">${player.height || '—'}</p></div>
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Weight</p><p style="font-weight: 700;">${player.weight || '—'} lbs</p></div>
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Class Year</p><p style="font-weight: 700;">${player.classYear || '—'}</p></div>
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">School</p><p style="font-weight: 700;">${player.school || '—'}</p></div>
-                    <div><p style="color: var(--text-muted); font-size: 0.8rem;">Location</p><p style="font-weight: 700;">${player.city || '—'}, ${player.state || ''}</p></div>
-                </div>
-
-                ${contactHtml}
-
-                <div style="background-color: var(--secondary-dark); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🏀 Game Style</p>
-                    <p style="font-weight: 600; margin-bottom: 1rem;">${player.description || 'No description yet'}</p>
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🎯 Looking For</p>
-                    <p style="font-weight: 600;">${player.coachType || '—'}</p>
-                </div>
-
-                <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
-                    <h3 style="font-size: 1rem; margin-bottom: 1rem; font-weight: 700;">📊 Season Stats</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem;">
-                        ${[{ label: 'PPG', value: playerStats.ppg }, { label: 'APG', value: playerStats.apg }, { label: 'RPG', value: playerStats.rpg }, { label: 'FG%', value: playerStats.fg }, { label: '3P%', value: playerStats['3p'] }, { label: 'SPG', value: playerStats.spg }, { label: 'BPG', value: playerStats.bpg }, { label: 'FT%', value: playerStats.ft }, { label: 'TOV', value: playerStats.tov }].map(stat => `
-                            <div style="background: #1e2025; border-radius: 8px; padding: 0.75rem; text-align: center;">
-                                <div style="font-size: 0.7rem; color: #a0a8b8;">${stat.label}</div>
-                                <div style="font-size: 1.3rem; font-weight: 900; color: var(--primary-orange);">${stat.value ?? '—'}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-
-                ${highlightReelsHtml}
-
-                <button class="btn btn-primary btn-block" onclick="app.likePlayer('${playerId}')" id="likeBtn" style="${likeButtonStyle}; padding: 0.75rem;">
-                    ${player.liked ? `❤️ Liked (${player.likes})` : `🤍 Like (${player.likes})`}
-                </button>
+                                </div>
+                            </a>
+                        `;
+                } else {
+                    return `
+                            <a href="${reel.url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                                <div style="background: #1e2025; border-radius: 12px; padding: 1rem; text-align: center;">
+                                    <div style="font-size: 2rem;">🎬</div>
+                                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;">${this.escapeHtml(title)}</div>
+                                </div>
+                            </a>
+                        `;
+                }
+            }).join('')}
             </div>
         </div>
     `;
-
-            document.getElementById('playerModal').classList.add('show');
         }
+
+        // Generate contact info HTML with overlay if not logged in
+        let contactHtml = '';
+        if (isLoggedIn) {
+            contactHtml = `
+        <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">📞 Contact Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                ${contactInfo.playerEmail ? `
+                    <div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Player Email</div>
+                        <div style="font-weight: 600;">${contactInfo.playerEmail}</div>
+                    </div>
+                ` : ''}
+                ${contactInfo.playerPhone ? `
+                    <div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Player Phone</div>
+                        <div style="font-weight: 600;">${contactInfo.playerPhone}</div>
+                    </div>
+                ` : ''}
+                ${contactInfo.parentName ? `
+                    <div style="grid-column: span 2; margin-top: 0.5rem;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Parent/Guardian</div>
+                        <div style="font-weight: 600;">${this.escapeHtml(contactInfo.parentName)}</div>
+                        ${contactInfo.parentEmail ? `<div style="font-size: 0.85rem;">${contactInfo.parentEmail}</div>` : ''}
+                        ${contactInfo.parentPhone ? `<div style="font-size: 0.85rem;">${contactInfo.parentPhone}</div>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+            ${!contactInfo.playerEmail && !contactInfo.playerPhone && !contactInfo.parentName ? '<div style="color: var(--text-muted); text-align: center;">No contact information provided</div>' : ''}
+        </div>
+    `;
+        } else {
+            contactHtml = `
+        <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; position: relative; filter: blur(4px);">
+            <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 700;">📞 Contact Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Player Email</div>
+                    <div style="font-weight: 600;">••••••••</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Player Phone</div>
+                    <div style="font-weight: 600;">••••••••</div>
+                </div>
+                <div style="grid-column: span 2;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Parent/Guardian</div>
+                    <div style="font-weight: 600;">••••••••</div>
+                </div>
+            </div>
+        </div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); padding: 2rem; border-radius: 12px; text-align: center; z-index: 100; width: 80%; max-width: 400px;">
+            <div style="font-size: 2rem; margin-bottom: 1rem;">🔒</div>
+            <h4 style="margin-bottom: 0.5rem; color: white;">Sign in to view contact info</h4>
+            <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 1.5rem;">Log in or sign up to see player contact details</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary" onclick="app.showLoginModal()" style="cursor: pointer;">Log In</button>
+                <button class="btn btn-secondary" onclick="app.showSignupModal()" style="cursor: pointer;">Sign Up</button>
+            </div>
+        </div>
+    `;
+        }
+
+        const modalBody = document.getElementById('playerModalBody');
+        modalBody.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr; gap: 1rem; ${!isLoggedIn ? 'position: relative;' : ''}">
+        <div>
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                ${profilePic.startsWith('http') ? `<img src="${profilePic}" alt="${player.name}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-orange);">` : `<div style="font-size: 3rem; margin-bottom: 1rem;">${profilePic}</div>`}
+                <h2 style="margin-bottom: 0.25rem;">${player.name}</h2>
+                ${player.premium ? '<p style="color: var(--primary-orange); font-weight: 700; margin-bottom: 0.5rem;">⭐ PREMIUM PLAYER</p>' : ''}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">Position</p><p style="font-weight: 700;">${player.position || '—'}</p></div>
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">Height</p><p style="font-weight: 700;">${player.height || '—'}</p></div>
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">Weight</p><p style="font-weight: 700;">${player.weight || '—'} lbs</p></div>
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">Class Year</p><p style="font-weight: 700;">${player.classYear || '—'}</p></div>
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">School</p><p style="font-weight: 700;">${player.school || '—'}</p></div>
+                <div><p style="color: var(--text-muted); font-size: 0.8rem;">Location</p><p style="font-weight: 700;">${player.city || '—'}, ${player.state || ''}</p></div>
+            </div>
+
+            ${contactHtml}
+
+            <div style="background-color: var(--secondary-dark); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🏀 Game Style</p>
+                <p style="font-weight: 600; margin-bottom: 1rem;">${player.description || 'No description yet'}</p>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.5rem;">🎯 Looking For</p>
+                <p style="font-weight: 600;">${player.coachType || '—'}</p>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #2a2d33 0%, #242729 100%); border: 1px solid #404450; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1rem; margin-bottom: 1rem; font-weight: 700;">📊 Season Stats</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem;">
+                    ${[{ label: 'PPG', value: playerStats.ppg }, { label: 'APG', value: playerStats.apg }, { label: 'RPG', value: playerStats.rpg }, { label: 'FG%', value: playerStats.fg }, { label: '3P%', value: playerStats['3p'] }, { label: 'SPG', value: playerStats.spg }, { label: 'BPG', value: playerStats.bpg }, { label: 'FT%', value: playerStats.ft }, { label: 'TOV', value: playerStats.tov }].map(stat => `
+                        <div style="background: #1e2025; border-radius: 8px; padding: 0.75rem; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #a0a8b8;">${stat.label}</div>
+                            <div style="font-size: 1.3rem; font-weight: 900; color: var(--primary-orange);">${stat.value ?? '—'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            ${highlightReelsHtml}
+
+            <button class="btn btn-primary btn-block" onclick="app.likePlayer('${playerId}')" id="likeBtn" style="${likeButtonStyle}; padding: 0.75rem;">
+                ${isLoggedIn ? (player.liked ? `❤️ Liked (${player.likes})` : `🤍 Like (${player.likes})`) : `🤍 Like to save (${player.likes})`}
+            </button>
+        </div>
+    </div>
+`;
+
+        document.getElementById('playerModal').classList.add('show');
     }
 
     async likePlayer(playerId) {

@@ -315,6 +315,55 @@
     background: var(--primary-orange);
 }
 
+
+/* Contact info overlay styling */
+.contact-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    backdrop-filter: blur(2px);
+}
+
+.contact-overlay-content {
+    text-align: center;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.contact-overlay-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.contact-overlay-title {
+    color: white;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.contact-overlay-text {
+    color: #ccc;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.contact-overlay-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
 /* ========== RESPONSIVE DESIGN ========== */
 @media (max-width: 768px) {
     .btn {

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Install HoopPortal</title>
+
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/profile.css">
+    <link rel="stylesheet" href="/extras/navbar.css">
+    <link rel="stylesheet" href="/css/modals.css">
+    <link rel="stylesheet" href="/extras/footer.css">
+
+    <style>
+        .install-page {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .install-card {
+            max-width: 700px;
+            width: 100%;
+            background: var(--primary-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+        }
+
+        .install-title {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            color: var(--text-light);
+        }
+
+        .install-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .install-btn {
+            background: var(--primary-orange);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s ease;
+            margin-bottom: 2rem;
+        }
+
+        .install-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .instructions {
+            text-align: left;
+            margin-top: 2rem;
+        }
+
+        .instructions h2 {
+            margin-bottom: 0.5rem;
+            color: var(--text-light);
+        }
+
+        .instructions p {
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+
+        .step {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="install-page">
+        <div class="install-card">
+
+            <h1 class="install-title">Install HoopPortal</h1>
+
+            <p class="install-subtitle">
+                Add HoopPortal to your phone for a faster, app-like experience.
+            </p>
+
+            <button id="installBtn" class="install-btn" style="display:none;">
+                Install App
+            </button>
+
+            <div class="instructions">
+
+                <h2>📱 iPhone / Safari</h2>
+
+                <div class="step">
+                    1. Tap the Share button in Safari
+                </div>
+
+                <div class="step">
+                    2. Scroll down and tap "Add to Home Screen"
+                </div>
+
+                <div class="step">
+                    3. Tap "Add"
+                </div>
+
+                <h2>🤖 Android / Chrome</h2>
+
+                <div class="step">
+                    1. Tap the 3-dot menu
+                </div>
+
+                <div class="step">
+                    2. Tap "Install App" or "Add to Home Screen"
+                </div>
+
+                <div class="step">
+                    3. Press Install
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="/extras/navbar.js"></script>
+    <script src="/extras/footer.js"></script>
+
+    <script>
+        let deferredPrompt;
+
+        const installBtn = document.getElementById('installBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+
+            deferredPrompt = e;
+
+            installBtn.style.display = 'inline-block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+
+            deferredPrompt.prompt();
+
+            const { outcome } = await deferredPrompt.userChoice;
+
+            console.log('Install outcome:', outcome);
+
+            deferredPrompt = null;
+
+            installBtn.style.display = 'none';
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('HoopPortal installed!');
+        });
+    </script>
+
+</body>
+
+</html>

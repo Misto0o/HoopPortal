@@ -9,6 +9,34 @@
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/extras/navbar.css">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>HoopPortal | Player Dashboard - Manage Your Recruitment Profile</title>
+        <meta name="description"
+            content="Manage your basketball recruitment profile. Update stats, upload highlights, and connect with coaches actively recruiting.">
+
+        <meta property="og:title" content="HoopPortal Player Dashboard - Manage Your Recruitment">
+        <meta property="og:description"
+            content="Your central hub for managing basketball recruitment. Track views, update profile, and get discovered.">
+        <meta property="og:url" content="https://hoopportal.com/dashboard.html">
+        <meta property="og:type" content="website">
+        <meta property="og:image" content="https://hoopportal.com/images/og-dashboard.jpg">
+
+        <meta name="twitter:title" content="HoopPortal Player Dashboard">
+        <meta name="twitter:description" content="Manage your basketball recruitment journey from one dashboard.">
+
+        <meta name="author" content="Kristian Cook">
+        <meta name="robots" content="noindex, follow">
+
+        <link rel="canonical" href="https://hoopportal.com/dashboard.html">
+        <link rel="icon" type="image/x-icon" href="HoopPortalcons/favicon.ico">
+        <link rel="manifest" href="manifest.json">
+        <link rel="stylesheet" href="css/footer.css">
+        <script src="js/footer.js"></script>
+    </head>
 </head>
 
 <body>
@@ -369,49 +397,49 @@
                 console.log('User Profile Data:', userProfileData, userError);
 
                 // Fill HTML with actual table data
-                document.getElementById('nameDisplay').textContent = 
+                document.getElementById('nameDisplay').textContent =
                     userProfileData ? `${userProfileData.first_name || ''} ${userProfileData.last_name || ''}`.trim() || 'Not set' : 'Not set';
 
-                document.getElementById('schoolDisplay').textContent = 
+                document.getElementById('schoolDisplay').textContent =
                     playerData?.school || 'Not set';
 
-                document.getElementById('transferSchoolDisplay').textContent = 
+                document.getElementById('transferSchoolDisplay').textContent =
                     playerData?.transfer_school || '--';
 
-                document.getElementById('positionDisplay').textContent = 
+                document.getElementById('positionDisplay').textContent =
                     playerData?.position || 'Not set';
 
-                document.getElementById('heightDisplay').textContent = 
+                document.getElementById('heightDisplay').textContent =
                     playerData?.height || 'Not set';
 
-                document.getElementById('weightDisplay').textContent = 
+                document.getElementById('weightDisplay').textContent =
                     playerData?.weight ? `${playerData.weight} lbs` : 'Not set';
 
-                document.getElementById('classDisplay').textContent = 
+                document.getElementById('classDisplay').textContent =
                     playerData?.class_year || 'Not set';
 
-                document.getElementById('cityDisplay').textContent = 
+                document.getElementById('cityDisplay').textContent =
                     playerData?.city || 'Not set';
 
-                document.getElementById('stateDisplay').textContent = 
+                document.getElementById('stateDisplay').textContent =
                     playerData?.state || 'Not set';
 
-                document.getElementById('ppgDisplay').textContent = 
+                document.getElementById('ppgDisplay').textContent =
                     statsData?.ppg || '--';
 
-                document.getElementById('apgDisplay').textContent = 
+                document.getElementById('apgDisplay').textContent =
                     statsData?.apg || '--';
 
-                document.getElementById('subStatus').textContent = 
+                document.getElementById('subStatus').textContent =
                     user.subscription === 'premium' ? 'Premium' : 'Basic';
 
-                document.getElementById('maxVideos').textContent = 
+                document.getElementById('maxVideos').textContent =
                     user.subscription === 'premium' ? '5' : '3';
 
-                document.getElementById('statusDisplay').textContent = 
+                document.getElementById('statusDisplay').textContent =
                     user.subscription ? 'Active' : 'Inactive';
 
-                document.getElementById('activeSince').textContent = 
+                document.getElementById('activeSince').textContent =
                     user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today';
 
             } catch (error) {

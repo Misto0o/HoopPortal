@@ -1,0 +1,58 @@
+{
+  "name": "HoopPortal",
+  "short_name": "HoopPortal",
+  "description": "Basketball recruitment platform connecting players and coaches",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#FF6B35",
+  "background_color": "#1a1c23",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/HoopPortalcons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/HoopPortalcons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to your dashboard",
+      "url": "/dashboard.html",
+      "icons": [{ "src": "/icons/dashboard-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Find Players",
+      "short_name": "Find",
+      "description": "Search for players",
+      "url": "/search.html",
+      "icons": [{ "src": "/icons/search-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Profile",
+      "short_name": "Profile",
+      "description": "View your profile",
+      "url": "/profile.html",
+      "icons": [{ "src": "/icons/profile-icon.png", "sizes": "96x96" }]
+    }
+  ],
+  "categories": ["sports", "education", "social"],
+  "screenshots": [
+    {
+      "src": "Images/HoopPortal.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide"
+    }
+  ],
+  "prefer_related_applications": false
+}

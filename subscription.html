@@ -4,147 +4,268 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Billing & Payment - HoopPortal</title>
+    <title>HoopPortal | Manage Account - Subscription & Settings</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/profile.css">
     <link rel="stylesheet" href="/extras/navbar.css">
+    <link rel="stylesheet" href="/css/modals.css">
+    <link rel="stylesheet" href="/extras/footer.css">
+    <script src="/extras/footer.js"></script>
+
+    <meta name="description"
+        content="Manage your HoopPortal account. View subscription status, update payment methods, cancel subscription, or delete your account.">
+    <meta name="author" content="Kristian Cook">
+    <meta name="robots" content="noindex, follow">
+
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="icon" type="image/x-icon" href="/HoopPortalcons/favicon.ico">
+    <link rel="manifest" href="/manifest.json">
+
+    <style>
+        .subscription-status-card {
+            background: linear-gradient(135deg, #1a1d22 0%, #0f1114 100%);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-inactive {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--primary-orange);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .danger-zone {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        .danger-zone h3 {
+            color: #ef4444;
+            margin-bottom: 1rem;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-confirm {
+            max-width: 500px;
+        }
+
+        .modal-confirm .modal-content {
+            text-align: center;
+        }
+
+        .warning-text {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-orange);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .notification-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+            font-weight: 600;
+        }
+
+        .notification-success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .notification-error {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .notification-warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <!-- Navigation will be loaded here by navbar.js -->
-
-    <!-- BILLING SECTION -->
     <section class="profile-section">
         <div class="section-container">
-            <h1>Billing & Payment</h1>
+            <h1>Account Management</h1>
+            <p class="profile-subtitle" style="margin-bottom: 2rem;">Manage your subscription, billing, and account
+                settings</p>
 
-            <div class="profile-container">
-                <div class="profile-card">
-                    <h2>Billing & Payment</h2>
-                    <p style="color: var(--text-muted); margin-bottom: 2rem;">Enter your details to activate your
-                        profile instantly.</p>
+            <div id="loadingContainer" class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Loading your account information...</p>
+            </div>
 
-                    <!-- Selected Plan Display -->
-                    <div
-                        style="background-color: var(--secondary-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Selected Plan
-                            </p>
-                            <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0;" id="selectedPlan">Premium</h3>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0; margin-top: 0.3rem;"
-                                id="planDetails">($4.99/month)</p>
-                        </div>
-                        <div style="text-align: right;">
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Total</p>
-                            <p style="font-size: 2rem; font-weight: 900; color: var(--primary-orange); margin: 0;"
-                                id="totalPrice">$4.99</p>
-                        </div>
-                    </div>
-
-                    <!-- Billing Form -->
-                    <form id="billingForm" class="profile-form">
-                        <div class="form-group">
-                            <label>Billing Name *</label>
-                            <input type="text" id="billingName" placeholder="Full Name" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Billing Email *</label>
-                            <input type="email" id="billingEmail" placeholder="your@email.com" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Card Number *</label>
-                            <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19"
-                                required>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Expiration *</label>
-                                <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" required>
-                            </div>
-                            <div class="form-group">
-                                <label>CVV *</label>
-                                <input type="text" id="cardCVV" placeholder="123" maxlength="4" required>
-                            </div>
-                        </div>
-
+            <div id="accountContent" style="display: none;">
+                <div class="profile-container" style="max-width: 800px; margin: 0 auto;">
+                    <div class="subscription-status-card">
                         <div
-                            style="background-color: var(--secondary-dark); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.8rem;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-orange)"
-                                stroke-width="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                            </svg>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">🔒 Secured & encrypted
-                                checkout</p>
+                            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                            <h2 style="margin: 0;">Current Plan</h2>
+                            <span class="status-badge" id="statusBadge">Checking...</span>
                         </div>
 
-                        <button type="submit" class="btn btn-primary btn-block">Confirm and Activate</button>
-                    </form>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+                                <span id="planIcon" style="font-size: 2rem;">⭐</span>
+                                <div>
+                                    <h3 id="planName" style="margin: 0; font-size: 1.5rem;">Loading...</h3>
+                                    <p id="planPrice" style="color: var(--text-muted); margin: 0;">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
 
-                    <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 1.5rem;">
-                        By clicking "Confirm and Activate", you agree to our payment terms. Your subscription will renew
-                        monthly unless cancelled.
-                    </p>
-                </div>
+                        <div class="info-row">
+                            <span class="info-label">Subscription Status</span>
+                            <span class="info-value" id="subscriptionStatusText">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Profile Visibility</span>
+                            <span class="info-value" id="visibilityStatus">Loading...</span>
+                        </div>
 
-                <!-- Subscription Info -->
-                <div class="profile-card">
-                    <h2>Subscription Information</h2>
-
-                    <div style="margin-bottom: 2rem;">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">What's Included
-                            in Premium:</p>
-                        <ul style="list-style: none; padding: 0; margin: 0;">
-                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Full profile
-                                visibility to all coaches</li>
-                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Featured at
-                                the top of all searches</li>
-                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Premium badge
-                                (⭐) on your profile</li>
-                            <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">✓ Up to 5
-                                highlight reels</li>
-                            <li style="padding: 0.6rem 0;">✓ Priority coach notifications</li>
-                        </ul>
+                        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <button id="upgradeDowngradeBtn" class="btn btn-primary">Upgrade Plan</button>
+                            <button id="cancelSubscriptionBtn" class="btn btn-secondary" style="display: none;">Cancel
+                                Subscription</button>
+                        </div>
                     </div>
 
-                    <div>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Cancel Anytime:
+                    <div class="subscription-status-card">
+                        <h2>Account Information</h2>
+                        <div class="info-row">
+                            <span class="info-label">Email</span>
+                            <span class="info-value" id="accountEmail">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Account Type</span>
+                            <span class="info-value" id="accountType">Loading...</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Account Created</span>
+                            <span class="info-value" id="accountCreated">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="subscription-status-card">
+                        <h2>Plan Features</h2>
+                        <div id="featuresList"></div>
+                    </div>
+
+                    <div class="danger-zone">
+                        <h3>⚠️ Danger Zone</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Once you delete your account, there
+                            is no going back. Please be certain.</p>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <button id="deleteAccountBtn" class="btn btn-danger">Delete Account</button>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem;">
+                            Deleting your account will permanently remove all your data. You will need to create a new
+                            account to use HoopPortal again.
                         </p>
-                        <p style="color: var(--text-muted); font-size: 0.95rem;">You can cancel your subscription at any
-                            time from your dashboard. No questions asked.</p>
-                    </div>
-                </div>
-
-                <!-- FAQ -->
-                <div class="profile-card">
-                    <h2>Questions?</h2>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">When will I be charged?</h4>
-                        <p style="color: var(--text-muted); margin: 0;">You'll be charged today, then monthly on the
-                            same date. Cancel anytime.</p>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">Is my payment information secure?</h4>
-                        <p style="color: var(--text-muted); margin: 0;">Yes! We use industry-standard encryption and
-                            never store full card numbers.</p>
-                    </div>
-
-                    <div>
-                        <h4 style="font-weight: 700; margin-bottom: 0.5rem;">Can I change my plan later?</h4>
-                        <p style="color: var(--text-muted); margin: 0;">Absolutely! You can upgrade, downgrade, or
-                            cancel anytime from your dashboard.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Modals -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content modal-confirm">
+            <button class="modal-close">&times;</button>
+            <div id="confirmModalBody"></div>
+        </div>
+    </div>
+
     <div id="authModal" class="modal">
         <div class="modal-content">
             <button class="modal-close">&times;</button>
@@ -152,64 +273,401 @@
         </div>
     </div>
 
-    <script src="/js/app.js"></script>
+    <script src="/extras/navbar.js"></script>
+
     <script>
-        // Handle card number formatting
-        document.getElementById('cardNumber')?.addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\s/g, '');
-            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
-            e.target.value = formatted;
-        });
+        const SUPABASE_URL = 'https://hpuikheuntquldqdewbr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwdWlraGV1bnRxdWxkcWRld2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNDc2MTQsImV4cCI6MjA5NDcyMzYxNH0.GVkICFVA3QOkZaYqf-MSag2yhCt68-M2QLGpi7_E0UA';
 
-        // Handle expiry formatting
-        document.getElementById('cardExpiry')?.addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+        let supabaseClient = null;
+        let currentUser = null;
+
+        function showNotification(message, type) {
+            const existing = document.querySelector('.notification-toast');
+            if (existing) existing.remove();
+
+            const notification = document.createElement('div');
+            notification.className = `notification-toast notification-${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        async function initSupabase() {
+            if (!window.supabase) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+                await new Promise((resolve) => {
+                    script.onload = resolve;
+                    document.head.appendChild(script);
+                });
             }
-            e.target.value = value;
-        });
+            const { createClient } = window.supabase;
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            window.supabaseClient = supabaseClient;
+        }
 
-        // Handle billing form
-        document.getElementById('billingForm')?.addEventListener('submit', (e) => {
-            e.preventDefault();
+        // First, let's check what columns exist in user_profiles
+        async function getUserProfileColumns() {
+            // Try to get a sample record to see what columns exist
+            const { data, error } = await supabaseClient
+                .from('user_profiles')
+                .select('*')
+                .limit(1);
 
-            // Get form data
-            const name = document.getElementById('billingName').value;
-            const email = document.getElementById('billingEmail').value;
-            const card = document.getElementById('cardNumber').value;
-            const plan = document.getElementById('selectedPlan').textContent;
+            if (data && data[0]) {
+                console.log('Available columns in user_profiles:', Object.keys(data[0]));
+            }
+            return data?.[0] || {};
+        }
 
-            // Show success message
-            app?.showNotification(`✓ ${plan} subscription activated! Check your email for confirmation.`, 'success');
+        async function checkAuthAndLoad() {
+            await initSupabase();
 
-            // Redirect after 2 seconds
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 2000);
-        });
+            // Check available columns first
+            await getUserProfileColumns();
 
-        // Get plan from URL or localStorage
-        document.addEventListener('DOMContentLoaded', () => {
-            const user = localStorage.getItem('hoopportal_user');
-            if (!user) {
-                window.location.href = 'plans.html';
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+
+            if (!session || !session.user) {
+                window.location.href = 'index.html';
                 return;
             }
 
-            const userData = JSON.parse(user);
-            const plan = userData.subscription || 'premium';
-            const price = plan === 'premium' ? '$4.99' : '$1.99';
-            const planName = plan === 'premium' ? 'Premium' : 'Basic';
-            const planText = plan === 'premium' ? '($4.99/month)' : '($1.99/month)';
+            const { data: userProfile, error: profileError } = await supabaseClient
+                .from('user_profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
 
-            document.getElementById('selectedPlan').textContent = planName;
-            document.getElementById('planDetails').textContent = planText;
-            document.getElementById('totalPrice').textContent = price;
-        });
+            if (!userProfile) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Check what subscription status columns exist
+            let subscriptionStatus = 'inactive';
+            let subscriptionPlan = null;
+
+            if (userProfile.subscription_status !== undefined) {
+                subscriptionStatus = userProfile.subscription_status;
+            }
+            if (userProfile.subscription_plan !== undefined) {
+                subscriptionPlan = userProfile.subscription_plan;
+            }
+
+            currentUser = {
+                id: session.user.id,
+                email: session.user.email,
+                userType: userProfile.user_type || 'player',
+                subscriptionStatus: subscriptionStatus,
+                subscriptionPlan: subscriptionPlan,
+                createdAt: session.user.created_at || new Date().toISOString(),
+                rawProfile: userProfile
+            };
+
+            localStorage.setItem('hoopportal_user', JSON.stringify(currentUser));
+
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('accountContent').style.display = 'block';
+
+            updateUI();
+            setupEventListeners();
+        }
+
+        function updateUI() {
+            const isActive = currentUser.subscriptionStatus === 'active';
+            const plan = currentUser.subscriptionPlan || 'none';
+
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('subscriptionStatusText');
+            const visibilityStatus = document.getElementById('visibilityStatus');
+
+            if (isActive) {
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge status-active';
+                    statusBadge.innerHTML = '✓ Active';
+                }
+                if (statusText) statusText.textContent = 'Active';
+                if (visibilityStatus) visibilityStatus.innerHTML = '<span style="color: #10b981;">✓ Visible to Coaches</span>';
+            } else {
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge status-inactive';
+                    statusBadge.innerHTML = '⚠️ Inactive';
+                }
+                if (statusText) statusText.textContent = 'Inactive - Not Visible';
+                if (visibilityStatus) visibilityStatus.innerHTML = '<span style="color: var(--primary-orange);">❌ Not Visible to Coaches</span>';
+            }
+
+            const planName = document.getElementById('planName');
+            const planPrice = document.getElementById('planPrice');
+            const planIcon = document.getElementById('planIcon');
+            const upgradeBtn = document.getElementById('upgradeDowngradeBtn');
+            const cancelBtn = document.getElementById('cancelSubscriptionBtn');
+
+            if (plan === 'premium') {
+                if (planName) planName.textContent = 'Premium Plan';
+                if (planPrice) planPrice.textContent = '$4.99 / month';
+                if (planIcon) planIcon.textContent = '⭐';
+                if (upgradeBtn) upgradeBtn.textContent = 'Downgrade to Basic';
+            } else if (plan === 'basic') {
+                if (planName) planName.textContent = 'Basic Plan';
+                if (planPrice) planPrice.textContent = 'Free Trial';
+                if (planIcon) planIcon.textContent = '🏀';
+                if (upgradeBtn) upgradeBtn.textContent = 'Upgrade to Premium';
+            } else {
+                if (planName) planName.textContent = 'No Active Plan';
+                if (planPrice) planPrice.textContent = 'Not subscribed';
+                if (planIcon) planIcon.textContent = '👤';
+                if (upgradeBtn) upgradeBtn.textContent = 'Get a Plan';
+            }
+
+            if (cancelBtn) {
+                if (isActive && plan !== 'none') {
+                    cancelBtn.style.display = 'inline-block';
+                } else {
+                    cancelBtn.style.display = 'none';
+                }
+            }
+
+            const accountEmail = document.getElementById('accountEmail');
+            const accountType = document.getElementById('accountType');
+            const accountCreated = document.getElementById('accountCreated');
+
+            if (accountEmail) accountEmail.textContent = currentUser.email || 'Not set';
+            if (accountType) accountType.textContent = currentUser.userType === 'player' ? '🏀 Player' : '👨‍🏫 Coach';
+            if (accountCreated) accountCreated.textContent = new Date(currentUser.createdAt).toLocaleDateString();
+
+            updateFeaturesList();
+        }
+
+        function updateFeaturesList() {
+            const plan = currentUser.subscriptionPlan || 'none';
+            const isActive = currentUser.subscriptionStatus === 'active';
+            const featuresList = document.getElementById('featuresList');
+
+            if (!featuresList) return;
+
+            let featuresHtml = '';
+
+            if (plan === 'premium' && isActive) {
+                featuresHtml = `
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Full profile visibility to all coaches</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Featured at the top of all searches</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Premium badge (⭐) on your profile</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Up to 5 highlight reels</li>
+                        <li style="padding: 0.75rem 0;">✓ Priority coach notifications</li>
+                    </ul>
+                `;
+            } else if (plan === 'basic' && isActive) {
+                featuresHtml = `
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Basic profile visibility to coaches</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Up to 3 highlight reels</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">✓ Basic search ranking</li>
+                        <li style="padding: 0.75rem 0;">✓ Coach contact available</li>
+                    </ul>
+                `;
+            } else {
+                featuresHtml = `
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); color: var(--text-muted);">❌ Profile NOT visible to coaches</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); color: var(--text-muted);">❌ Cannot upload highlight reels</li>
+                        <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); color: var(--text-muted);">❌ Not featured in searches</li>
+                        <li style="padding: 0.75rem 0; color: var(--text-muted);">❌ Coaches cannot contact you</li>
+                    </ul>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="window.location.href='plans.html'">Subscribe Now</button>
+                    </div>
+                `;
+            }
+
+            featuresList.innerHTML = featuresHtml;
+        }
+
+        function closeModal(modal) {
+            if (modal) modal.classList.remove('show');
+        }
+
+        function showCancelConfirmation() {
+            const modal = document.getElementById('confirmModal');
+            const modalBody = document.getElementById('confirmModalBody');
+
+            if (!modal || !modalBody) return;
+
+            modalBody.innerHTML = `
+                <div style="padding: 1rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                    <h3>Cancel Subscription?</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                        Are you sure you want to cancel your subscription? Your profile will no longer be visible to coaches.
+                    </p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button class="btn btn-secondary" id="cancelConfirmNo">Keep Subscription</button>
+                        <button class="btn btn-danger" id="cancelConfirmYes">Yes, Cancel</button>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('show');
+
+            document.getElementById('cancelConfirmNo')?.addEventListener('click', () => {
+                closeModal(modal);
+            });
+
+            document.getElementById('cancelConfirmYes')?.addEventListener('click', async () => {
+                await cancelSubscription();
+                closeModal(modal);
+            });
+        }
+
+        async function cancelSubscription() {
+            try {
+                // Only update if the column exists
+                const updateData = {};
+                if (currentUser.rawProfile.subscription_status !== undefined) {
+                    updateData.subscription_status = 'inactive';
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                    const { error } = await supabaseClient
+                        .from('user_profiles')
+                        .update(updateData)
+                        .eq('id', currentUser.id);
+
+                    if (error) throw error;
+                }
+
+                currentUser.subscriptionStatus = 'inactive';
+                localStorage.setItem('hoopportal_user', JSON.stringify(currentUser));
+
+                showNotification('Your subscription has been cancelled. Your profile is no longer visible to coaches.', 'warning');
+                updateUI();
+
+            } catch (error) {
+                console.error('Cancel subscription error:', error);
+                showNotification('Failed to cancel subscription. Please try again.', 'error');
+            }
+        }
+
+        function showDeleteConfirmation() {
+            const modal = document.getElementById('confirmModal');
+            const modalBody = document.getElementById('confirmModalBody');
+
+            if (!modal || !modalBody) return;
+
+            modalBody.innerHTML = `
+                <div style="padding: 1rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🗑️</div>
+                    <h3 class="warning-text">Delete Account?</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                        This action <strong>cannot be undone</strong>. All your data will be permanently deleted from:
+                    </p>
+                    <div style="background: rgba(239, 68, 68, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                        <ul style="margin: 0; font-size: 0.85rem; color: var(--text-muted); text-align: left;">
+                            <li>Profile information</li>
+                            <li>Player/Coach stats and data</li>
+                            <li>Highlight reels</li>
+                            <li>Contact information</li>
+                            <li>Liked players and saved lists</li>
+                            <li>Account settings</li>
+                        </ul>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: flex; align-items: center; gap: 8px; justify-content: center; cursor: pointer;">
+                            <input type="checkbox" id="confirmDeleteCheckbox">
+                            <span style="font-size: 0.9rem;">I understand this action is permanent</span>
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button class="btn btn-secondary" id="deleteConfirmNo">Keep Account</button>
+                        <button class="btn btn-danger" id="deleteConfirmYes" disabled>Delete Account</button>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('show');
+
+            const checkbox = document.getElementById('confirmDeleteCheckbox');
+            const confirmBtn = document.getElementById('deleteConfirmYes');
+
+            if (checkbox && confirmBtn) {
+                checkbox.addEventListener('change', (e) => {
+                    confirmBtn.disabled = !e.target.checked;
+                });
+            }
+
+            document.getElementById('deleteConfirmNo')?.addEventListener('click', () => {
+                closeModal(modal);
+            });
+
+            document.getElementById('deleteConfirmYes')?.addEventListener('click', async () => {
+                await deleteAccount();
+                closeModal(modal);
+            });
+        }
+
+        async function deleteAccount() {
+            try {
+                showNotification('Deleting your account...', 'warning');
+
+                const response = await fetch('/.netlify/functions/delete-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to delete account');
+                }
+
+                // Clear local storage
+                await supabaseClient.auth.signOut();
+                localStorage.clear();
+                sessionStorage.clear();
+
+                showNotification('Account deleted.', 'success');
+                setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+
+            } catch (error) {
+                console.error('Delete error:', error);
+                showNotification(error.message, 'error');
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('upgradeDowngradeBtn')?.addEventListener('click', () => {
+                window.location.href = 'plans.html';
+            });
+
+            document.getElementById('cancelSubscriptionBtn')?.addEventListener('click', () => {
+                showCancelConfirmation();
+            });
+
+            document.getElementById('deleteAccountBtn')?.addEventListener('click', () => {
+                showDeleteConfirmation();
+            });
+
+            document.querySelectorAll('.modal-close').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const modal = e.target.closest('.modal');
+                    if (modal) closeModal(modal);
+                });
+            });
+
+            window.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal')) {
+                    closeModal(e.target);
+                }
+            });
+        }
+
+        checkAuthAndLoad();
     </script>
-    <script src="/extras/navbar.js"></script>
-    <script src="/js/app.js"></script>
 </body>
 
 </html>
