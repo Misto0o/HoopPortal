@@ -3,7 +3,7 @@
 
 class CacheBusterNuker {
   constructor() {
-    this.version = '3.0.0';
+    this.version = '4.0.0';
     this.swRegistration = null;
     this.init();
   }
