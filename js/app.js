@@ -7,16 +7,29 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 
 async function initializeSupabase() {
+    // Check if supabase is already loaded
+    if (supabaseClient) return supabaseClient;
+
+    // Wait for the Supabase script to load if needed
     if (!window.supabase) {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
             script.onload = resolve;
+            script.onerror = reject;
             document.head.appendChild(script);
         });
     }
+
+    // Create the client
     const { createClient } = window.supabase;
     supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Small delay to ensure client is ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    console.log('[Supabase] Client initialized successfully');
+    return supabaseClient;
 }
 
 (function () {
@@ -1562,6 +1575,14 @@ class HoopPortalApp {
     // LOAD REAL PLAYERS FROM SUPABASE
     // ============================================
     async loadSearchPlayers() {
+        console.log('[loadSearchPlayers] Starting...');
+        console.log('[loadSearchPlayers] supabaseClient exists?', !!supabaseClient);
+
+        if (!supabaseClient) {
+            console.error('[loadSearchPlayers] supabaseClient is null! Re-initializing...');
+            await initializeSupabase();
+        }
+
         try {
             const { data: playerData, error: playerError } = await supabaseClient
                 .from('player_profiles')
@@ -1582,10 +1603,6 @@ class HoopPortalApp {
             if (likesError) throw likesError;
 
             const isCoach = this.currentUser?.userType === 'coach';
-
-            // DEBUG: Log what's happening
-            console.log('Current user type:', this.currentUser?.userType);
-            console.log('Is Coach?', isCoach);
 
             const likeCounts = {};
             likesData?.forEach(like => {
