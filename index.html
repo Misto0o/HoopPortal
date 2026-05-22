@@ -75,6 +75,21 @@
     }
     </script>
 
+    <script>
+        // Handle client-side routing
+        (function () {
+            const path = window.location.pathname;
+            const validPages = ['/', '/index.html', '/profile.html', '/search.html', '/plans.html', '/coach-dashboard.html', '/subscription.html', '/privacy.html', '/install.html'];
+
+            if (!validPages.includes(path) && !path.startsWith('/css/') && !path.startsWith('/js/') && !path.startsWith('/images/') && path !== '/sw.js' && path !== '/manifest.json') {
+                // For unknown routes, redirect to index.html (client-side)
+                if (!path.includes('.')) {
+                    window.location.href = '/';
+                }
+            }
+        })();
+    </script>
+
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/sections.css">
