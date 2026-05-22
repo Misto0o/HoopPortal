@@ -7,19 +7,31 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 
 async function initializeSupabase() {
-    if (!window.supabase) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-        await new Promise((resolve) => {
-            script.onload = resolve;
-            document.head.appendChild(script);
-        });
+    console.log('[initializeSupabase] Starting...');
+
+    // Wait for supabase library to be available
+    let attempts = 0;
+    while (!window.supabase && attempts < 50) {
+        console.log('[initializeSupabase] Waiting for supabase library...');
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+        attempts++;
     }
+
+    if (!window.supabase) {
+        console.error('[initializeSupabase] ❌ Supabase library failed to load!');
+        throw new Error('Supabase library not available');
+    }
+
+    console.log('[initializeSupabase] ✅ Supabase library loaded');
+
     const { createClient } = window.supabase;
     supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    // EXPOSE GLOBALLY FOR OTHER PAGES
     window.supabaseClient = supabaseClient;
+
+    console.log('[initializeSupabase] ✅ Supabase client initialized');
+    return supabaseClient;
 }
+
 (function () {
     // Check if service worker is supported
     if ('serviceWorker' in navigator) {
@@ -86,12 +98,17 @@ class HoopPortalApp {
     }
 
     async init() {
-        await initializeSupabase();
+        console.log('[init] Starting app initialization...');
+
+        await initializeSupabase();  // ← WAIT for this to complete
+
         this.setupEventListeners();
         this.checkAuthStatus();
-        await this.loadSearchPlayers();
+        await this.loadSearchPlayers();  // ← Now this can safely use supabaseClient
         this.loadPageContent();
         this.handleCheckoutSuccess();
+
+        console.log('[init] ✅ App initialized successfully');
     }
 
     setupEventListeners() {
